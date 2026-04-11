@@ -2,6 +2,7 @@ const { handleOpenAIRequest } = require('../utils/openaihandler');
 const User = require('../models/user');
 const Conversation = require('../models/conversation');
 const { createRoleplayEmbed } = require('../utils/embeds');
+const config = require('../utils/config');
 
 module.exports = {
     name: 'messageCreate',
@@ -29,7 +30,7 @@ module.exports = {
             if (!conversation) {
                 conversation = new Conversation({
                     userId: message.author.id,
-                    characterName: user.defaultCharacterName || 'Lilith',
+                    characterName: user.defaultCharacterName || config.defaultCharacterName,
                     messages: []
                 });
             }
@@ -42,16 +43,23 @@ module.exports = {
             const characterProfile = user.characterProfiles.find(
                 profile => profile.name === conversation.characterName
             ) || {
-                name: 'Lilith',
-                personality: 'A kind and helpful AI assistant with a cheerful personality.',
-                appearance: 'Has long silver hair and bright blue eyes.'
+                name: config.defaultCharacterName,
+                personality: config.fallbackPersonality,
+                appearance: config.appearance.defaultAppearance
             };
             
             message.channel.sendTyping();
             
             const userPreferences = {
                 preferredLanguage: user.preferredLanguage || 'Vietnamese',
-                customBotPersonality: user.customBotPersonality || ''
+                customBotPersonality: user.customBotPersonality || '',
+                responseStyle: user.responseStyle || {
+                    length: 'poetic',
+                    poeticLevel: 5,
+                    detailLevel: 5,
+                    metaphorUsage: true,
+                    paragraphCount: 5
+                }
             };
             
             const aiResponse = await handleOpenAIRequest(conversation.messages, characterProfile, userPreferences);

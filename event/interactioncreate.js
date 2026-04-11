@@ -372,6 +372,59 @@ module.exports = {
                         });
                     }
                 }
+                
+                // Response style handlers
+                else if (interaction.customId === 'select_response_length') {
+                    const length = interaction.values[0];
+                    
+                    await User.findOneAndUpdate(
+                        { userId: interaction.user.id },
+                        { 'responseStyle.length': length },
+                        { upsert: true }
+                    );
+                    
+                    const lengthLabels = {
+                        'short': 'Ngắn gọn',
+                        'medium': 'Trung bình',
+                        'long': 'Dài',
+                        'poetic': 'Thơ mộng (Poetic)'
+                    };
+                    
+                    await interaction.reply({
+                        content: `Độ dài phản hồi đã được đặt thành: **${lengthLabels[length]}**`,
+                        ephemeral: true
+                    });
+                }
+                
+                else if (interaction.customId === 'select_poetic_level') {
+                    const level = parseInt(interaction.values[0]);
+                    
+                    await User.findOneAndUpdate(
+                        { userId: interaction.user.id },
+                        { 'responseStyle.poeticLevel': level },
+                        { upsert: true }
+                    );
+                    
+                    await interaction.reply({
+                        content: `Mức độ thơ mộng đã được đặt thành: **${level}/5**`,
+                        ephemeral: true
+                    });
+                }
+                
+                else if (interaction.customId === 'select_detail_level') {
+                    const level = parseInt(interaction.values[0]);
+                    
+                    await User.findOneAndUpdate(
+                        { userId: interaction.user.id },
+                        { 'responseStyle.detailLevel': level },
+                        { upsert: true }
+                    );
+                    
+                    await interaction.reply({
+                        content: `Mức độ chi tiết đã được đặt thành: **${level}/5**`,
+                        ephemeral: true
+                    });
+                }
             }
             
             // Handle modal submissions

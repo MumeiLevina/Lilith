@@ -3,6 +3,7 @@ const { handleOpenAIRequest } = require('../utils/openaihandler');
 const User = require('../models/user');
 const Conversation = require('../models/conversation');
 const { createRoleplayEmbed } = require('../utils/embeds');
+const config = require('../utils/config');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,7 +32,7 @@ module.exports = {
             if (!conversation) {
                 conversation = new Conversation({
                     userId: interaction.user.id,
-                    characterName: user.defaultCharacterName || 'Lilith',
+                    characterName: user.defaultCharacterName || config.defaultCharacterName,
                     messages: []
                 });
             }
@@ -45,9 +46,9 @@ module.exports = {
             const characterProfile = user.characterProfiles.find(
                 profile => profile.name === conversation.characterName
             ) || {
-                name: 'Mumei Levina',
-                personality: 'A kind and helpful AI assistant with a cheerful personality.',
-                appearance: 'Has long silver hair and bright blue eyes.'
+                name: config.defaultCharacterName,
+                personality: config.fallbackPersonality,
+                appearance: config.appearance.defaultAppearance
             };
             
             const aiResponse = await handleOpenAIRequest(conversation.messages, characterProfile);

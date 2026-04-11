@@ -28,7 +28,11 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('personality')
-                .setDescription('Tùy chỉnh tính cách của bot')),
+                .setDescription('Tùy chỉnh tính cách của bot'))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('response_style')
+                .setDescription('Tùy chỉnh phong cách trả lời (dài ngắn, văn thơ)')),
     
     async execute(interaction) {
         if (interaction.options.getSubcommand() === 'view') {
@@ -43,6 +47,8 @@ module.exports = {
             await handleLanguageSettings(interaction);
         } else if (interaction.options.getSubcommand() === 'personality') {
             await handlePersonalitySettings(interaction);
+        } else if (interaction.options.getSubcommand() === 'response_style') {
+            await handleResponseStyleSettings(interaction);
         }
     }
 };
@@ -333,4 +339,170 @@ async function handleDeleteCharacter(interaction) {
             ephemeral: true
         });
     }
+}
+
+async function handleResponseStyleSettings(interaction) {
+    try {
+        const user = await User.findOne({ userId: interaction.user.id });
+        
+        // Nếu user chưa tồn tại, tạo mới
+        if (!user) {
+            await User.findOneAndUpdate(
+                { userId: interaction.user.id },
+                { userId: interaction.user.id },
+                { upsert: true, new: true }
+            );
+        }
+        
+        const currentStyle = user?.responseStyle || {
+            length: 'poetic',
+            poeticLevel: 5,
+            detailLevel: 5,
+            metaphorUsage: true,
+            paragraphCount: 5
+        };
+        
+        // Tạo menu chọn độ dài
+        const lengthSelect = new ActionRowBuilder()
+            .addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('select_response_length')
+                    .setPlaceholder('Chọn độ dài phản hồi')
+                    .addOptions([
+                        {
+                            label: 'Ngắn gọn',
+                            description: '1-2 đoạn văn, ngắn gọn súc tích',
+                            value: 'short',
+                            default: currentStyle.length === 'short'
+                        },
+                        {
+                            label: 'Trung bình',
+                            description: '2-3 đoạn văn, cân bằng',
+                            value: 'medium',
+                            default: currentStyle.length === 'medium'
+                        },
+                        {
+                            label: 'Dài',
+                            description: '4-6 đoạn văn, chi tiết sâu',
+                            value: 'long',
+                            default: currentStyle.length === 'long'
+                        },
+                        {
+                            label: 'Thơ mộng (Poetic)',
+                            description: '5-8 đoạn văn, CỰC KỲ dài, văn chương cao',
+                            value: 'poetic',
+                            default: currentStyle.length === 'poetic'
+                        },
+                    ]),
+            );
+        
+        // Tạo menu chọn mức độ thơ mộng
+        const poeticSelect = new ActionRowBuilder()
+            .addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('select_poetic_level')
+                    .setPlaceholder('Chọn mức độ thơ mộng')
+                    .addOptions([
+                        {
+                            label: '⭐ Cấp 1 - Bình thường',
+                            description: 'Ngôn từ thường ngày, ít ẩn dụ',
+                            value: '1',
+                            default: currentStyle.poeticLevel === 1
+                        },
+                        {
+                            label: '⭐⭐ Cấp 2 - Nhẹ nhàng',
+                            description: 'Một chút thơ mộng, vài ẩn dụ',
+                            value: '2',
+                            default: currentStyle.poeticLevel === 2
+                        },
+                        {
+                            label: '⭐⭐⭐ Cấp 3 - Trung bình',
+                            description: 'Khá thơ mộng, nhiều hình ảnh',
+                            value: '3',
+                            default: currentStyle.poeticLevel === 3
+                        },
+                        {
+                            label: '⭐⭐⭐⭐ Cấp 4 - Cao',
+                            description: 'Rất thơ mộng, nhiều ẩn dụ văn chương',
+                            value: '4',
+                            default: currentStyle.poeticLevel === 4
+                        },
+                        {
+                            label: '⭐⭐⭐⭐⭐ Cấp 5 - Tối đa',
+                            description: 'CỰC KỲ thơ mộng, ngôn ngữ văn chương cao',
+                            value: '5',
+                            default: currentStyle.poeticLevel === 5
+                        },
+                    ]),
+            );
+        
+        // Tạo menu chọn mức độ chi tiết
+        const detailSelect = new ActionRowBuilder()
+            .addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('select_detail_level')
+                    .setPlaceholder('Chọn mức độ chi tiết')
+                    .addOptions([
+                        {
+                            label: '📝 Cấp 1 - Tối giản',
+                            description: 'Chỉ ý chính, không mở rộng',
+                            value: '1',
+                            default: currentStyle.detailLevel === 1
+                        },
+                        {
+                            label: '📝📝 Cấp 2 - Cơ bản',
+                            description: 'Đủ thông tin, ít chi tiết',
+                            value: '2',
+                            default: currentStyle.detailLevel === 2
+                        },
+                        {
+                            label: '📝📝📝 Cấp 3 - Đầy đủ',
+                            description: 'Chi tiết vừa phải',
+                            value: '3',
+                            default: currentStyle.detailLevel === 3
+                        },
+                        {
+                            label: '📝📝📝📝 Cấp 4 - Sâu sắc',
+                            description: 'Rất chi tiết, triển khai sâu',
+                            value: '4',
+                            default: currentStyle.detailLevel === 4
+                        },
+                        {
+                            label: '📝📝📝📝📝 Cấp 5 - Tối đa',
+                            description: 'CỰC KỲ chi tiết, mỗi ý đều được mở rộng',
+                            value: '5',
+                            default: currentStyle.detailLevel === 5
+                        },
+                    ]),
+            );
+        
+        await interaction.reply({
+            content: `**Tùy chỉnh phong cách phản hồi**\n\n` +
+                   `**Cài đặt hiện tại:**\n` +
+                   `- Độ dài: **${getLengthLabel(currentStyle.length)}**\n` +
+                   `- Mức độ thơ mộng: **${currentStyle.poeticLevel}/5**\n` +
+                   `- Mức độ chi tiết: **${currentStyle.detailLevel}/5**\n` +
+                   `- Sử dụng ẩn dụ: **${currentStyle.metaphorUsage ? 'CÓ' : 'KHÔNG'}**\n` +
+                   `- Số đoạn văn: **${currentStyle.paragraphCount}**\n\n` +
+                   `Chọn từng mục bên dưới để tùy chỉnh:`,
+            components: [lengthSelect, poeticSelect, detailSelect],
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('Error in handleResponseStyleSettings:', error);
+        await interaction.reply({
+            content: `Đã xảy ra lỗi khi cài đặt phong cách: ${error.message}`,
+            ephemeral: true
+        });
+    }
+}
+
+function getLengthLabel(length) {
+    const labels = {
+        'short': 'Ngắn gọn',
+        'medium': 'Trung bình',
+        'long': 'Dài',
+        'poetic': 'Thơ mộng (Poetic)'
+    };
+    return labels[length] || 'Thơ mộng (Poetic)';
 }
