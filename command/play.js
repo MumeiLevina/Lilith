@@ -1,5 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
-const { ensureMusicReady } = require('../utils/music');
+const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } = require('discord.js');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
 
@@ -17,13 +16,24 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
 
-        if (!await ensureMusicReady(interaction)) return;
+        const sendPrivateValidationError = async (message) => {
+            await interaction.deleteReply().catch(() => {});
+            await interaction.followUp({
+                content: message,
+                flags: MessageFlags.Ephemeral
+            });
+        };
+
+        if (!interaction.client.musicReady) {
+            await sendPrivateValidationError('Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.');
+            return;
+        }
 
         const query = interaction.options.getString('query', true);
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
-            await interaction.editReply('Bạn cần vào một voice channel trước khi dùng lệnh này.');
+            await sendPrivateValidationError('Bạn cần vào một voice channel trước khi dùng lệnh này.');
             return;
         }
 
@@ -32,7 +42,7 @@ module.exports = {
             !botPermissions?.has(PermissionsBitField.Flags.Connect) ||
             !botPermissions?.has(PermissionsBitField.Flags.Speak)
         ) {
-            await interaction.editReply('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
+            await sendPrivateValidationError('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
             return;
         }
 

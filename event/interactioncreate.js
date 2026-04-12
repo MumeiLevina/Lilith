@@ -24,7 +24,8 @@ async function sendInteractionError(interaction, content) {
             await interaction.reply({ content, flags: MessageFlags.Ephemeral });
         }
     } catch (responseError) {
-        // 10062: interaction token expired/unknown, 40060: already acknowledged.
+        // DISCORD_ERROR_UNKNOWN_INTERACTION: interaction token expired/unknown.
+        // DISCORD_ERROR_ALREADY_ACKNOWLEDGED: interaction was already acknowledged.
         if (![DISCORD_ERROR_UNKNOWN_INTERACTION, DISCORD_ERROR_ALREADY_ACKNOWLEDGED].includes(responseError?.code)) {
             console.error('Failed to send interaction error response:', responseError);
         }
