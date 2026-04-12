@@ -38,7 +38,9 @@ async function ensureMusicReady(interaction) {
     if (interaction.client.musicReady) return true;
 
     if (interaction.deferred || interaction.replied) {
-        await interaction.deleteReply().catch(() => {});
+        await interaction.deleteReply().catch(() => {
+            // Ignore if the deferred placeholder was already removed.
+        });
         await interaction.followUp({
             content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
             flags: MessageFlags.Ephemeral

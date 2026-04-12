@@ -17,8 +17,10 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
 
-        const sendPrivateValidationError = async (message) => {
-            await interaction.deleteReply().catch(() => {});
+        const sendValidationError = async (message) => {
+            await interaction.deleteReply().catch(() => {
+                // Ignore if the deferred placeholder was already removed.
+            });
             await interaction.followUp({
                 content: message,
                 flags: MessageFlags.Ephemeral
@@ -31,7 +33,7 @@ module.exports = {
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
-            await sendPrivateValidationError('Bạn cần vào một voice channel trước khi dùng lệnh này.');
+            await sendValidationError('Bạn cần vào một voice channel trước khi dùng lệnh này.');
             return;
         }
 
@@ -40,7 +42,7 @@ module.exports = {
             !botPermissions?.has(PermissionsBitField.Flags.Connect) ||
             !botPermissions?.has(PermissionsBitField.Flags.Speak)
         ) {
-            await sendPrivateValidationError('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
+            await sendValidationError('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
             return;
         }
 
