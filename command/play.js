@@ -10,7 +10,7 @@ const YOUTUBE_HOSTS = new Set([
     'youtu.be',
     'www.youtu.be'
 ]);
-const TRACKING_PARAMS = new Set([
+const YOUTUBE_TRACKING_PARAMS = new Set([
     'si',
     'feature',
     'pp',
@@ -34,7 +34,7 @@ function sanitizeYoutubeUrl(query) {
         const filteredParams = new URLSearchParams();
         for (const [key, value] of url.searchParams.entries()) {
             const lowerKey = key.toLowerCase();
-            const isTrackingParam = TRACKING_PARAMS.has(lowerKey) || lowerKey.startsWith('utm_');
+            const isTrackingParam = YOUTUBE_TRACKING_PARAMS.has(lowerKey) || lowerKey.startsWith('utm_');
 
             if (!isTrackingParam) {
                 filteredParams.append(key, value);
