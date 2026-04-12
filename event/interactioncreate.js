@@ -13,6 +13,9 @@ const {
     MessageFlags
 } = require('discord.js');
 
+const DISCORD_ERROR_UNKNOWN_INTERACTION = 10062;
+const DISCORD_ERROR_ALREADY_ACKNOWLEDGED = 40060;
+
 async function sendInteractionError(interaction, content) {
     try {
         if (interaction.replied || interaction.deferred) {
@@ -21,7 +24,8 @@ async function sendInteractionError(interaction, content) {
             await interaction.reply({ content, flags: MessageFlags.Ephemeral });
         }
     } catch (responseError) {
-        if (![10062, 40060].includes(responseError?.code)) {
+        // 10062: interaction token expired/unknown, 40060: already acknowledged.
+        if (![DISCORD_ERROR_UNKNOWN_INTERACTION, DISCORD_ERROR_ALREADY_ACKNOWLEDGED].includes(responseError?.code)) {
             console.error('Failed to send interaction error response:', responseError);
         }
     }
