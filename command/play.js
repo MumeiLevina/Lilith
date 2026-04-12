@@ -2,6 +2,43 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } =
 const { ensureMusicReady } = require('../utils/music');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
+const YOUTUBE_HOSTS = new Set([
+    'youtube.com',
+    'www.youtube.com',
+    'm.youtube.com',
+    'music.youtube.com',
+    'youtu.be',
+    'www.youtu.be'
+]);
+
+function sanitizeYoutubeUrl(query) {
+    try {
+        const url = new URL(query.trim());
+        const hostname = url.hostname.toLowerCase();
+        if (!YOUTUBE_HOSTS.has(hostname)) return query;
+
+        const filteredParams = new URLSearchParams();
+        for (const [key, value] of url.searchParams.entries()) {
+            const lowerKey = key.toLowerCase();
+            const isTrackingParam = lowerKey === 'si'
+                || lowerKey === 'feature'
+                || lowerKey === 'pp'
+                || lowerKey === 'fbclid'
+                || lowerKey === 'gclid'
+                || lowerKey === 'igshid'
+                || lowerKey.startsWith('utm_');
+
+            if (!isTrackingParam) {
+                filteredParams.append(key, value);
+            }
+        }
+
+        url.search = filteredParams.toString();
+        return url.toString();
+    } catch {
+        return query;
+    }
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -33,6 +70,7 @@ module.exports = {
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
+        const sanitizedQuery = sanitizeYoutubeUrl(query);
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
@@ -50,7 +88,7 @@ module.exports = {
         }
 
         try {
-            const result = await interaction.client.player.play(channel, query, {
+            const playOptions = {
                 requestedBy: interaction.user,
                 nodeOptions: {
                     metadata: {
@@ -59,7 +97,21 @@ module.exports = {
                     leaveOnEmpty: true,
                     leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS
                 }
-            });
+            };
+
+            let result;
+            try {
+                result = await interaction.client.player.play(channel, query, playOptions);
+            } catch (error) {
+                const shouldRetryWithSanitizedUrl = error?.code === 'ERR_NO_RESULT'
+                    && sanitizedQuery !== query;
+
+                if (!shouldRetryWithSanitizedUrl) {
+                    throw error;
+                }
+
+                result = await interaction.client.player.play(channel, sanitizedQuery, playOptions);
+            }
 
             const track = result.track;
             const queuedEmbed = new EmbedBuilder()
@@ -78,8 +130,14 @@ module.exports = {
             await interaction.editReply({ embeds: [queuedEmbed] });
         } catch (error) {
             console.error('Play command error:', error);
+            const noResultHint = error?.code === 'ERR_NO_RESULT'
+                ? '\nGợi ý: thử dùng link YouTube đầy đủ (`https://www.youtube.com/watch?v=...`) hoặc nhập từ khóa tìm kiếm.'
+                : '';
+            const setupHint = error?.message?.toLowerCase()?.includes('extractor')
+                ? '\nNếu lỗi lặp lại, hãy chạy lại `npm install` và khởi động lại bot để nạp extractor.'
+                : '';
             const reason = error?.message ? `\nChi tiết: ${error.message}` : '';
-            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${reason}`);
+            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${noResultHint}${setupHint}${reason}`);
         }
     }
 };
