@@ -5,6 +5,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
+const { hasDjPermission } = require('./utils/music');
 
 const BUTTON_COLLECTOR_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -87,6 +88,14 @@ client.player.events.on('playerStart', async (queue, track) => {
         if (!memberVoiceChannel || memberVoiceChannel !== botVoiceChannel) {
             await interaction.reply({
                 content: 'Bạn cần ở cùng kênh voice với bot để dùng nút điều khiển.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        if (!hasDjPermission(interaction.member)) {
+            await interaction.reply({
+                content: `Bạn cần role **${process.env.DJ_ROLE_NAME || 'DJ'}** (hoặc quyền quản trị) để dùng nút điều khiển.`,
                 ephemeral: true
             });
             return;

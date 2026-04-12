@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { ensureMusicReady } = require('../utils/music');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
 
@@ -14,13 +15,7 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        if (!interaction.client.musicReady) {
-            await interaction.reply({
-                content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
-                ephemeral: true
-            });
-            return;
-        }
+        if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
         const channel = interaction.member?.voice?.channel;

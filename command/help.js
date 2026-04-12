@@ -19,12 +19,19 @@ module.exports = {
                 { name: '`/settings language`', value: 'Đặt ngôn ngữ ưa thích của bạn' },
                 { name: '`/settings personality`', value: 'Tùy chỉnh tính cách của bot' },
                 { name: '`/play [query]`', value: 'Phát nhạc từ link YouTube/Spotify/SoundCloud hoặc từ khóa tìm kiếm' },
+                { name: '`/queue`', value: 'Xem danh sách hàng đợi phát nhạc' },
+                { name: '`/nowplaying`', value: 'Hiển thị bài hát đang phát cùng tiến trình' },
                 { name: '`/skip`', value: 'Bỏ qua bài hát hiện tại' },
+                { name: '`/pause`', value: 'Tạm dừng bài hát hiện tại (DJ)' },
+                { name: '`/resume`', value: 'Tiếp tục phát nhạc (DJ)' },
                 { name: '`/stop`', value: 'Dừng phát nhạc và xóa hàng đợi' },
+                { name: '`/loop [mode]`', value: 'Đặt loop mode: off/track/queue (DJ)' },
+                { name: '`/autoplay [state]`', value: 'Bật/tắt autoplay khi hết queue (DJ)' },
                 { name: '`/help`', value: 'Hiển thị thông báo trợ giúp này' }
             )
             .addFields(
-                { name: 'Cách sử dụng', value: 'Bạn cũng có thể nhắn tin trực tiếp bằng cách đề cập đến bot: `@Lilith [tin nhắn của bạn]`' }
+                { name: 'Cách sử dụng', value: 'Bạn cũng có thể nhắn tin trực tiếp bằng cách đề cập đến bot: `@Lilith [tin nhắn của bạn]`' },
+                { name: 'Ghi chú DJ', value: 'Lệnh điều khiển nhạc yêu cầu role `DJ` mặc định (có thể đổi bằng `DJ_ROLE_NAME` hoặc `DJ_ROLE_ID` trong env).' }
             )
             .setImage('https://www.google.com/url?sa=i&url=https%3A%2F%2Fza.pinterest.com%2Fbradleyperelaer%2Fnoexistencen%2F&psig=AOvVaw0cnl0pV-2puUZ1J1QGn3Jf&ust=1754480013384000&source=images&cd=vfe&opi=89978449&ved=0CBUQjRxqFwoTCICJvb7J844DFQAAAAAdAAAAABAE')
             .setFooter({ text: 'Lilith Bot' })
