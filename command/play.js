@@ -15,16 +15,15 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        await interaction.deferReply();
+
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
-            await interaction.reply({
-                content: 'Bạn cần vào một voice channel trước khi dùng lệnh này.',
-                ephemeral: true
-            });
+            await interaction.editReply('Bạn cần vào một voice channel trước khi dùng lệnh này.');
             return;
         }
 
@@ -33,14 +32,9 @@ module.exports = {
             !botPermissions?.has(PermissionsBitField.Flags.Connect) ||
             !botPermissions?.has(PermissionsBitField.Flags.Speak)
         ) {
-            await interaction.reply({
-                content: 'Bot cần quyền **Connect** và **Speak** trong voice channel này.',
-                ephemeral: true
-            });
+            await interaction.editReply('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
             return;
         }
-
-        await interaction.deferReply();
 
         try {
             const result = await interaction.client.player.play(channel, query, {

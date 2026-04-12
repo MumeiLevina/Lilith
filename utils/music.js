@@ -37,10 +37,14 @@ async function ensureDjPermission(interaction) {
 async function ensureMusicReady(interaction) {
     if (interaction.client.musicReady) return true;
 
-    await interaction.reply({
-        content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
-        ephemeral: true
-    });
+    if (interaction.deferred || interaction.replied) {
+        await interaction.editReply('Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.');
+    } else {
+        await interaction.reply({
+            content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
+            ephemeral: true
+        });
+    }
     return false;
 }
 
