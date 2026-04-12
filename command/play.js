@@ -87,7 +87,7 @@ module.exports = {
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
-        const youtubeUrl = isYoutubeUrl(query);
+        const isYoutube = isYoutubeUrl(query);
         const sanitizedQuery = sanitizeYoutubeUrl(query);
         const channel = interaction.member?.voice?.channel;
 
@@ -121,7 +121,7 @@ module.exports = {
             try {
                 result = await interaction.client.player.play(channel, query, playOptions);
             } catch (error) {
-                const shouldRetry = youtubeUrl
+                const shouldRetry = isYoutube
                     && error?.code === 'ERR_NO_RESULT'
                     && sanitizedQuery !== query;
 
