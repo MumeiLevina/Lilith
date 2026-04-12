@@ -80,7 +80,24 @@ npm run dev
 - `/settings delete_character` - Xóa nhân vật
 - `/settings language` - Đổi ngôn ngữ
 - `/settings personality` - Tùy chỉnh tính cách bot
+- `/play [query]` - Phát nhạc từ link hoặc từ khóa tìm kiếm
+- `/queue` - Xem danh sách hàng đợi
+- `/nowplaying` - Xem bài hát đang phát và tiến trình
+- `/skip` - Bỏ qua bài hát đang phát
+- `/pause` - Tạm dừng bài hát hiện tại (DJ)
+- `/resume` - Tiếp tục phát nhạc (DJ)
+- `/stop` - Dừng phát nhạc và xóa hàng đợi
+- `/loop [mode]` - Chế độ lặp: off/track/queue (DJ)
+- `/autoplay [state]` - Bật/tắt autoplay (DJ)
 - `/help` - Hiển thị trợ giúp
+
+### DJ Role cho lệnh điều khiển nhạc
+
+- Mặc định role yêu cầu là `DJ`.
+- Có thể cấu hình qua env:
+  - `DJ_ROLE_NAME=DJ`
+  - `DJ_ROLE_ID=<discord_role_id>`
+- Thành viên có quyền `Administrator` hoặc `ManageGuild` có thể dùng lệnh DJ mà không cần role.
 
 ## Phát triển tương lai
 
