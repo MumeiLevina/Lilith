@@ -2,6 +2,67 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } =
 const { ensureMusicReady } = require('../utils/music');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
+// Known YouTube domains accepted for URL validation/sanitization.
+const YOUTUBE_HOSTS = new Set([
+    'youtube.com',
+    'www.youtube.com',
+    'm.youtube.com',
+    'music.youtube.com',
+    'youtu.be',
+    'www.youtu.be'
+]);
+// Common tracking parameters that should be stripped from YouTube share links.
+const YOUTUBE_TRACKING_PARAMS = new Set([
+    'si',
+    'feature',
+    'pp',
+    'fbclid',
+    'gclid',
+    'igshid'
+]);
+
+/**
+ * Remove tracking query params from YouTube URLs while preserving playable params.
+ * Returns original query when input is not a YouTube URL or cannot be parsed as URL.
+ * @param {string} query
+ * @returns {string}
+ */
+function sanitizeYoutubeUrl(query) {
+    try {
+        const url = new URL(query.trim());
+        const hostname = url.hostname.toLowerCase();
+        if (!YOUTUBE_HOSTS.has(hostname)) return query;
+
+        const filteredParams = new URLSearchParams();
+        for (const [key, value] of url.searchParams.entries()) {
+            const lowerKey = key.toLowerCase();
+            const isTrackingParam = YOUTUBE_TRACKING_PARAMS.has(lowerKey) || lowerKey.startsWith('utm_');
+
+            if (!isTrackingParam) {
+                filteredParams.append(key, value);
+            }
+        }
+
+        url.search = filteredParams.toString();
+        return url.toString();
+    } catch {
+        return query;
+    }
+}
+
+/**
+ * Check whether the input query is a valid URL on a known YouTube domain.
+ * @param {string} query
+ * @returns {boolean}
+ */
+function isYoutubeUrl(query) {
+    try {
+        const url = new URL(query.trim());
+        return YOUTUBE_HOSTS.has(url.hostname.toLowerCase());
+    } catch {
+        return false;
+    }
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -33,6 +94,8 @@ module.exports = {
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
+        const isYoutube = isYoutubeUrl(query);
+        const sanitizedQuery = sanitizeYoutubeUrl(query);
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
@@ -50,7 +113,7 @@ module.exports = {
         }
 
         try {
-            const result = await interaction.client.player.play(channel, query, {
+            const playOptions = {
                 requestedBy: interaction.user,
                 nodeOptions: {
                     metadata: {
@@ -59,7 +122,22 @@ module.exports = {
                     leaveOnEmpty: true,
                     leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS
                 }
-            });
+            };
+
+            let result;
+            try {
+                result = await interaction.client.player.play(channel, query, playOptions);
+            } catch (error) {
+                const shouldRetry = isYoutube
+                    && error?.code === 'ERR_NO_RESULT'
+                    && sanitizedQuery !== query;
+
+                if (!shouldRetry) {
+                    throw error;
+                }
+
+                result = await interaction.client.player.play(channel, sanitizedQuery, playOptions);
+            }
 
             const track = result.track;
             const queuedEmbed = new EmbedBuilder()
@@ -78,8 +156,11 @@ module.exports = {
             await interaction.editReply({ embeds: [queuedEmbed] });
         } catch (error) {
             console.error('Play command error:', error);
+            const noResultHint = error?.code === 'ERR_NO_RESULT'
+                ? '\nGợi ý: thử link khác hoặc nhập từ khóa tìm kiếm.'
+                : '';
             const reason = error?.message ? `\nChi tiết: ${error.message}` : '';
-            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${reason}`);
+            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${noResultHint}${reason}`);
         }
     }
 };
