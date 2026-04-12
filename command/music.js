@@ -13,7 +13,11 @@ const {
     entersState,
     StreamType,
 } = require('@discordjs/voice');
-const play = require('play-dl');
+const playDl = require('play-dl');
+const QUEUE_PREVIEW_LIMIT = 10;
+const YOUTUBE_STREAM_QUALITY = 2;
+const VOICE_RECONNECTION_TIMEOUT = 5_000;
+const DEFAULT_VOLUME = 0.5;
 
 const guildStates = new Map();
 
@@ -30,11 +34,15 @@ function clearState(guildId) {
 
     try {
         state.player.stop(true);
-    } catch (_) {}
+    } catch (error) {
+        console.debug('[music] Failed to stop player during cleanup:', error.message);
+    }
 
     try {
         state.connection.destroy();
-    } catch (_) {}
+    } catch (error) {
+        console.debug('[music] Failed to destroy connection during cleanup:', error.message);
+    }
 
     guildStates.delete(guildId);
 }
@@ -47,6 +55,7 @@ function getOrCreateState(interaction, voiceChannel) {
         if (state.voiceChannelId !== voiceChannel.id) {
             throw new Error('BOT_IN_ANOTHER_CHANNEL');
         }
+        state.textChannelId = interaction.channelId;
         return state;
     }
 
@@ -73,7 +82,7 @@ function getOrCreateState(interaction, voiceChannel) {
         current: null,
         textChannelId: interaction.channelId,
         voiceChannelId: voiceChannel.id,
-        volume: 0.5,
+        volume: DEFAULT_VOLUME,
     };
 
     player.on(AudioPlayerStatus.Idle, async () => {
@@ -89,8 +98,8 @@ function getOrCreateState(interaction, voiceChannel) {
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
         try {
             await Promise.race([
-                entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-                entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                entersState(connection, VoiceConnectionStatus.Signalling, VOICE_RECONNECTION_TIMEOUT),
+                entersState(connection, VoiceConnectionStatus.Connecting, VOICE_RECONNECTION_TIMEOUT),
             ]);
         } catch (_) {
             clearState(guildId);
@@ -112,15 +121,15 @@ async function sendToTextChannel(client, channelId, content) {
 }
 
 async function resolveTrack(query) {
-    if (play.yt_validate(query) === 'video') {
-        const info = await play.video_basic_info(query);
+    if (playDl.yt_validate(query) === 'video') {
+        const info = await playDl.video_basic_info(query);
         return {
             title: info.video_details.title,
             url: info.video_details.url,
         };
     }
 
-    const results = await play.search(query, {
+    const results = await playDl.search(query, {
         source: { youtube: 'video' },
         limit: 1,
     });
@@ -148,8 +157,8 @@ async function playNext(client, guildId) {
     state.current = nextTrack;
 
     try {
-        const stream = await play.stream(nextTrack.url, {
-            quality: 2,
+        const stream = await playDl.stream(nextTrack.url, {
+            quality: YOUTUBE_STREAM_QUALITY,
             discordPlayerCompatibility: true,
         });
 
@@ -183,11 +192,13 @@ function formatQueue(state) {
     if (!state.queue.length) return `${nowPlaying}\n\nHàng chờ trống.`;
 
     const queueText = state.queue
-        .slice(0, 10)
+        .slice(0, QUEUE_PREVIEW_LIMIT)
         .map((track, index) => `${index + 1}. ${track.title}`)
         .join('\n');
+    const hiddenCount = Math.max(0, state.queue.length - QUEUE_PREVIEW_LIMIT);
+    const hiddenText = hiddenCount > 0 ? `\n...và ${hiddenCount} bài khác.` : '';
 
-    return `${nowPlaying}\n\n📜 Hàng chờ:\n${queueText}`;
+    return `${nowPlaying}\n\n📜 Hàng chờ:\n${queueText}${hiddenText}`;
 }
 
 module.exports = {
@@ -261,7 +272,6 @@ module.exports = {
         let state;
         try {
             state = getOrCreateState(interaction, voiceChannel);
-            state.textChannelId = interaction.channelId;
         } catch (error) {
             if (error.message === 'BOT_IN_ANOTHER_CHANNEL') {
                 return interaction.reply({
