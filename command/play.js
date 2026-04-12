@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
-const LEAVE_ON_EMPTY_COOLDOWN_MS = 60_000;
-const LEAVE_ON_END_COOLDOWN_MS = 30_000;
+const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
+const LEAVE_ON_END_DELAY_MS = 30_000;
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -48,9 +48,9 @@ module.exports = {
                         channel: interaction.channel
                     },
                     leaveOnEmpty: true,
-                    leaveOnEmptyCooldown: LEAVE_ON_EMPTY_COOLDOWN_MS,
+                    leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS,
                     leaveOnEnd: true,
-                    leaveOnEndCooldown: LEAVE_ON_END_COOLDOWN_MS
+                    leaveOnEndCooldown: LEAVE_ON_END_DELAY_MS
                 }
             });
 

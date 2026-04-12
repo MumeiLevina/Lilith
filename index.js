@@ -6,6 +6,8 @@ const mongoose = require('mongoose');
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
 
+const BUTTON_COLLECTOR_TIMEOUT_MS = 15 * 60 * 1000;
+
 // Create client instance
 const client = new Client({ 
     intents: [
@@ -59,13 +61,13 @@ client.player.events.on('playerStart', async (queue, track) => {
     }
 
     const message = await channel.send({ embeds: [nowPlayingEmbed], components: [controls] });
-    const collector = message.createMessageComponentCollector({ time: 15 * 60 * 1000 });
+    const collector = message.createMessageComponentCollector({ time: BUTTON_COLLECTOR_TIMEOUT_MS });
 
     collector.on('collect', async interaction => {
         if (!interaction.isButton()) return;
-        const queueNode = interaction.client.player.nodes.get(interaction.guildId);
+        const queue = interaction.client.player.nodes.get(interaction.guildId);
 
-        if (!queueNode || !queueNode.currentTrack) {
+        if (!queue || !queue.currentTrack) {
             await interaction.reply({ content: 'Không còn bài nào trong hàng đợi.', ephemeral: true });
             return;
         }
@@ -82,7 +84,7 @@ client.player.events.on('playerStart', async (queue, track) => {
         }
 
         if (interaction.customId === 'music_skip') {
-            const skipped = queueNode.node.skip();
+            const skipped = queue.node.skip();
             await interaction.reply({
                 content: skipped ? '⏭️ Đã chuyển sang bài tiếp theo.' : 'Không thể skip lúc này.',
                 ephemeral: true
@@ -91,7 +93,7 @@ client.player.events.on('playerStart', async (queue, track) => {
         }
 
         if (interaction.customId === 'music_stop') {
-            queueNode.delete();
+            queue.delete();
             await interaction.reply({ content: '⏹️ Đã dừng nhạc và xóa hàng đợi.', ephemeral: true });
         }
     });
