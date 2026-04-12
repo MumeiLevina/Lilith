@@ -10,7 +10,21 @@ const YOUTUBE_HOSTS = new Set([
     'youtu.be',
     'www.youtu.be'
 ]);
+const TRACKING_PARAMS = new Set([
+    'si',
+    'feature',
+    'pp',
+    'fbclid',
+    'gclid',
+    'igshid'
+]);
 
+/**
+ * Remove tracking query params from YouTube URLs while preserving playable params.
+ * Returns original query when input is not a YouTube URL or cannot be parsed as URL.
+ * @param {string} query
+ * @returns {string}
+ */
 function sanitizeYoutubeUrl(query) {
     try {
         const url = new URL(query.trim());
@@ -20,13 +34,7 @@ function sanitizeYoutubeUrl(query) {
         const filteredParams = new URLSearchParams();
         for (const [key, value] of url.searchParams.entries()) {
             const lowerKey = key.toLowerCase();
-            const isTrackingParam = lowerKey === 'si'
-                || lowerKey === 'feature'
-                || lowerKey === 'pp'
-                || lowerKey === 'fbclid'
-                || lowerKey === 'gclid'
-                || lowerKey === 'igshid'
-                || lowerKey.startsWith('utm_');
+            const isTrackingParam = TRACKING_PARAMS.has(lowerKey) || lowerKey.startsWith('utm_');
 
             if (!isTrackingParam) {
                 filteredParams.append(key, value);
@@ -103,10 +111,10 @@ module.exports = {
             try {
                 result = await interaction.client.player.play(channel, query, playOptions);
             } catch (error) {
-                const shouldRetryWithSanitizedUrl = error?.code === 'ERR_NO_RESULT'
+                const shouldRetry = error?.code === 'ERR_NO_RESULT'
                     && sanitizedQuery !== query;
 
-                if (!shouldRetryWithSanitizedUrl) {
+                if (!shouldRetry) {
                     throw error;
                 }
 
@@ -133,11 +141,8 @@ module.exports = {
             const noResultHint = error?.code === 'ERR_NO_RESULT'
                 ? '\nGợi ý: thử dùng link YouTube đầy đủ (`https://www.youtube.com/watch?v=...`) hoặc nhập từ khóa tìm kiếm.'
                 : '';
-            const setupHint = error?.message?.toLowerCase()?.includes('extractor')
-                ? '\nNếu lỗi lặp lại, hãy chạy lại `npm install` và khởi động lại bot để nạp extractor.'
-                : '';
             const reason = error?.message ? `\nChi tiết: ${error.message}` : '';
-            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${noResultHint}${setupHint}${reason}`);
+            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${noResultHint}${reason}`);
         }
     }
 };
