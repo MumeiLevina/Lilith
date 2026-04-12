@@ -38,8 +38,11 @@ async function ensureMusicReady(interaction) {
     if (interaction.client.musicReady) return true;
 
     if (interaction.deferred || interaction.replied) {
-        await interaction.deleteReply().catch(() => {
-            // Ignore if the deferred placeholder was already removed.
+        await interaction.deleteReply().catch((deleteError) => {
+            // Ignore "Unknown Message" if the deferred placeholder was already removed.
+            if (deleteError?.code !== 10008) {
+                console.error('Failed to remove deferred music readiness reply:', deleteError);
+            }
         });
         await interaction.followUp({
             content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
