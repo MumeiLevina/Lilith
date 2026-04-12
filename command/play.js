@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } =
 const { ensureMusicReady } = require('../utils/music');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
+// Known YouTube domains accepted for URL validation/sanitization.
 const YOUTUBE_HOSTS = new Set([
     'youtube.com',
     'www.youtube.com',
@@ -10,6 +11,7 @@ const YOUTUBE_HOSTS = new Set([
     'youtu.be',
     'www.youtu.be'
 ]);
+// Common tracking parameters that should be stripped from YouTube share links.
 const YOUTUBE_TRACKING_PARAMS = new Set([
     'si',
     'feature',
@@ -48,6 +50,11 @@ function sanitizeYoutubeUrl(query) {
     }
 }
 
+/**
+ * Check whether the input query is a valid URL on a known YouTube domain.
+ * @param {string} query
+ * @returns {boolean}
+ */
 function isYoutubeUrl(query) {
     try {
         const url = new URL(query.trim());
