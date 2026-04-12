@@ -48,6 +48,15 @@ function sanitizeYoutubeUrl(query) {
     }
 }
 
+function isYoutubeUrl(query) {
+    try {
+        const url = new URL(query.trim());
+        return YOUTUBE_HOSTS.has(url.hostname.toLowerCase());
+    } catch {
+        return false;
+    }
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('play')
@@ -78,6 +87,7 @@ module.exports = {
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
+        const youtubeUrl = isYoutubeUrl(query);
         const sanitizedQuery = sanitizeYoutubeUrl(query);
         const channel = interaction.member?.voice?.channel;
 
@@ -111,7 +121,8 @@ module.exports = {
             try {
                 result = await interaction.client.player.play(channel, query, playOptions);
             } catch (error) {
-                const shouldRetry = error?.code === 'ERR_NO_RESULT'
+                const shouldRetry = youtubeUrl
+                    && error?.code === 'ERR_NO_RESULT'
                     && sanitizedQuery !== query;
 
                 if (!shouldRetry) {
@@ -139,7 +150,7 @@ module.exports = {
         } catch (error) {
             console.error('Play command error:', error);
             const noResultHint = error?.code === 'ERR_NO_RESULT'
-                ? '\nGợi ý: thử dùng link YouTube đầy đủ (`https://www.youtube.com/watch?v=...`) hoặc nhập từ khóa tìm kiếm.'
+                ? '\nGợi ý: thử link khác hoặc nhập từ khóa tìm kiếm.'
                 : '';
             const reason = error?.message ? `\nChi tiết: ${error.message}` : '';
             await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${noResultHint}${reason}`);
