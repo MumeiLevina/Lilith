@@ -1,4 +1,4 @@
-const { PermissionsBitField } = require('discord.js');
+const { PermissionsBitField, MessageFlags } = require('discord.js');
 
 const DJ_ROLE_NAME = process.env.DJ_ROLE_NAME || 'DJ';
 const DJ_ROLE_ID = process.env.DJ_ROLE_ID;
@@ -37,10 +37,23 @@ async function ensureDjPermission(interaction) {
 async function ensureMusicReady(interaction) {
     if (interaction.client.musicReady) return true;
 
-    await interaction.reply({
-        content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
-        ephemeral: true
-    });
+    if (interaction.deferred || interaction.replied) {
+        await interaction.deleteReply().catch((deleteError) => {
+            // Ignore "Unknown Message" if the deferred placeholder was already removed.
+            if (deleteError?.code !== 10008) {
+                console.error('Failed to remove deferred music readiness reply:', deleteError);
+            }
+        });
+        await interaction.followUp({
+            content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
+            flags: MessageFlags.Ephemeral
+        });
+    } else {
+        await interaction.reply({
+            content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
     return false;
 }
 

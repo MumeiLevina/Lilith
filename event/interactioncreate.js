@@ -2,7 +2,35 @@ const User = require('../models/user');
 const Conversation = require('../models/conversation');
 const { handleOpenAIRequest } = require('../utils/openaihandler');
 const { createRoleplayEmbed } = require('../utils/embeds');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
+const {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    StringSelectMenuBuilder,
+    MessageFlags
+} = require('discord.js');
+
+const DISCORD_ERROR_UNKNOWN_INTERACTION = 10062;
+const DISCORD_ERROR_ALREADY_ACKNOWLEDGED = 40060;
+
+async function sendInteractionError(interaction, content) {
+    try {
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+        } else {
+            await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+        }
+    } catch (responseError) {
+        // DISCORD_ERROR_UNKNOWN_INTERACTION: interaction token expired/unknown.
+        // DISCORD_ERROR_ALREADY_ACKNOWLEDGED: interaction was already acknowledged.
+        if (![DISCORD_ERROR_UNKNOWN_INTERACTION, DISCORD_ERROR_ALREADY_ACKNOWLEDGED].includes(responseError?.code)) {
+            console.error('Failed to send interaction error response:', responseError);
+        }
+    }
+}
 
 module.exports = {
     name: 'interactionCreate',
@@ -17,11 +45,7 @@ module.exports = {
                     await command.execute(interaction);
                 } catch (error) {
                     console.error(error);
-                    if (interaction.replied || interaction.deferred) {
-                        await interaction.followUp({ content: 'There was an error executing this command!', ephemeral: true });
-                    } else {
-                        await interaction.reply({ content: 'There was an error executing this command!', ephemeral: true });
-                    }
+                    await sendInteractionError(interaction, 'There was an error executing this command!');
                 }
                 return;
             }
@@ -548,18 +572,7 @@ module.exports = {
             
         } catch (error) {
             console.error('Error in interactionCreate event:', error);
-            
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ 
-                    content: 'There was an error processing your interaction.', 
-                    ephemeral: true 
-                });
-            } else {
-                await interaction.reply({ 
-                    content: 'There was an error processing your interaction.', 
-                    ephemeral: true 
-                });
-            }
+            await sendInteractionError(interaction, 'There was an error processing your interaction.');
         }
     }
 };

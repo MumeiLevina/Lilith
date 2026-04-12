@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } = require('discord.js');
 const { ensureMusicReady } = require('../utils/music');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
@@ -15,16 +15,28 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        await interaction.deferReply();
+
+        const sendValidationError = async (message) => {
+            await interaction.deleteReply().catch((deleteError) => {
+                // Ignore "Unknown Message" if the deferred placeholder was already removed.
+                if (deleteError?.code !== 10008) {
+                    console.error('Failed to remove deferred play reply:', deleteError);
+                }
+            });
+            await interaction.followUp({
+                content: message,
+                flags: MessageFlags.Ephemeral
+            });
+        };
+
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
-            await interaction.reply({
-                content: 'Bạn cần vào một voice channel trước khi dùng lệnh này.',
-                ephemeral: true
-            });
+            await sendValidationError('Bạn cần vào một voice channel trước khi dùng lệnh này.');
             return;
         }
 
@@ -33,14 +45,9 @@ module.exports = {
             !botPermissions?.has(PermissionsBitField.Flags.Connect) ||
             !botPermissions?.has(PermissionsBitField.Flags.Speak)
         ) {
-            await interaction.reply({
-                content: 'Bot cần quyền **Connect** và **Speak** trong voice channel này.',
-                ephemeral: true
-            });
+            await sendValidationError('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
             return;
         }
-
-        await interaction.deferReply();
 
         try {
             const result = await interaction.client.player.play(channel, query, {
