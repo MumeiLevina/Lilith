@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { handleOpenAIRequest } = require('../utils/openaihandler');
+const { handleGeminiRequest } = require('../utils/geminihandler');
 const User = require('../models/user');
 const Conversation = require('../models/conversation');
 const { createRoleplayEmbed } = require('../utils/embeds');
@@ -51,7 +51,7 @@ module.exports = {
                 appearance: config.appearance.defaultAppearance
             };
             
-            const aiResponse = await handleOpenAIRequest(conversation.messages, characterProfile);
+            const aiResponse = await handleGeminiRequest(conversation.messages, characterProfile);
             
             conversation.messages.push({
                 role: 'assistant',

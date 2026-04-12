@@ -150,6 +150,6 @@ Cảm xúc:
   // Legacy properties for backward compatibility
   defaultPersonality: 'Lilith - một bản thể huyễn hoặc được sinh ra từ khát vọng cô đơn nhất của con người.',
   maxConversationLength: 20,
-  openAIModel: 'gpt-4o-mini',
+  geminiModel: 'gemini-2.5-flash',
   clientId: process.env.CLIENT_ID
 };

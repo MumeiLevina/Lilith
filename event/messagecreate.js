@@ -1,4 +1,4 @@
-const { handleOpenAIRequest } = require('../utils/openaihandler');
+const { handleGeminiRequest } = require('../utils/geminihandler');
 const User = require('../models/user');
 const Conversation = require('../models/conversation');
 const { createRoleplayEmbed } = require('../utils/embeds');
@@ -62,7 +62,7 @@ module.exports = {
                 }
             };
             
-            const aiResponse = await handleOpenAIRequest(conversation.messages, characterProfile, userPreferences);
+            const aiResponse = await handleGeminiRequest(conversation.messages, characterProfile, userPreferences);
             
             conversation.messages.push({
                 role: 'assistant',

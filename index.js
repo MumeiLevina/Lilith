@@ -5,9 +5,23 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
+const { YoutubeExtractor } = require('discord-player-youtube');
 const { hasDjPermission } = require('./utils/music');
 
 const BUTTON_COLLECTOR_TIMEOUT_MS = 15 * 60 * 1000;
+
+try {
+    const ffmpegPath = require('ffmpeg-static');
+    if (ffmpegPath && !process.env.FFMPEG_PATH) {
+        process.env.FFMPEG_PATH = ffmpegPath;
+    }
+} catch {
+    console.warn('ffmpeg-static is not available. Music playback may fail if FFmpeg is not installed system-wide.');
+}
+
+if (!process.env.YOUTUBE_COOKIE) {
+    console.warn('YOUTUBE_COOKIE is not set. Some YouTube videos may require sign-in and fail to stream.');
+}
 
 // Create client instance
 const client = new Client({ 
@@ -27,6 +41,10 @@ client.player = new Player(client);
 client.musicReady = false;
 
 client.player.extractors.loadMulti(DefaultExtractors)
+    .then(() => client.player.extractors.register(YoutubeExtractor, {
+        cookie: process.env.YOUTUBE_COOKIE,
+        filterAutoplayTracks: true
+    }))
     .then(() => {
         client.musicReady = true;
         console.log('Music extractors loaded successfully.');
@@ -139,8 +157,38 @@ client.player.events.on('playerError', (queue, error) => {
     queue?.metadata?.channel?.send('⚠️ Không thể phát bài hát này, đang thử bài kế tiếp.');
 });
 
+function normalizeMongoUri(uri) {
+    if (!uri || typeof uri !== 'string') return uri;
+
+    const match = uri.match(/^(mongodb(?:\+srv)?:\/\/)([^@]+)@(.*)$/i);
+    if (!match) return uri;
+
+    const prefix = match[1];
+    const credentials = match[2];
+    const rest = match[3];
+    const separatorIndex = credentials.indexOf(':');
+
+    if (separatorIndex === -1) return uri;
+
+    const rawUsername = credentials.slice(0, separatorIndex);
+    const rawPassword = credentials.slice(separatorIndex + 1);
+
+    const normalizeCredential = value => {
+        try {
+            return encodeURIComponent(decodeURIComponent(value));
+        } catch {
+            return encodeURIComponent(value);
+        }
+    };
+
+    const username = normalizeCredential(rawUsername);
+    const password = normalizeCredential(rawPassword);
+
+    return `${prefix}${username}:${password}@${rest}`;
+}
+
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(normalizeMongoUri(process.env.MONGODB_URI))
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('MongoDB connection error:', err));
 
