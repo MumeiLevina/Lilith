@@ -18,6 +18,9 @@ module.exports = {
                 { name: '`/settings delete_character`', value: 'Xóa một nhân vật đã tạo' },
                 { name: '`/settings language`', value: 'Đặt ngôn ngữ ưa thích của bạn' },
                 { name: '`/settings personality`', value: 'Tùy chỉnh tính cách của bot' },
+                { name: '`/music play [query]`', value: 'Phát nhạc hoặc thêm vào hàng chờ' },
+                { name: '`/music queue`', value: 'Xem hàng chờ nhạc hiện tại' },
+                { name: '`/music skip|pause|resume|stop|volume`', value: 'Điều khiển trình phát nhạc' },
                 { name: '`/help`', value: 'Hiển thị thông báo trợ giúp này' }
             )
             .addFields(

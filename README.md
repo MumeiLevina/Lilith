@@ -80,6 +80,13 @@ npm run dev
 - `/settings delete_character` - Xóa nhân vật
 - `/settings language` - Đổi ngôn ngữ
 - `/settings personality` - Tùy chỉnh tính cách bot
+- `/music play [query]` - Phát nhạc hoặc thêm vào hàng chờ
+- `/music queue` - Xem hàng chờ hiện tại
+- `/music skip` - Bỏ qua bài đang phát
+- `/music pause` - Tạm dừng bài hiện tại
+- `/music resume` - Tiếp tục phát
+- `/music stop` - Dừng phát và xóa hàng chờ
+- `/music volume [1-100]` - Chỉnh âm lượng
 - `/help` - Hiển thị trợ giúp
 
 ## Phát triển tương lai
