@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } = require('discord.js');
+const { ensureMusicReady } = require('../utils/music');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
 
@@ -24,10 +25,7 @@ module.exports = {
             });
         };
 
-        if (!interaction.client.musicReady) {
-            await sendPrivateValidationError('Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.');
-            return;
-        }
+        if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
         const channel = interaction.member?.voice?.channel;
