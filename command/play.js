@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
-const LEAVE_ON_END_DELAY_MS = 30_000;
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -15,6 +14,14 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        if (!interaction.client.musicReady) {
+            await interaction.reply({
+                content: 'Tính năng nhạc chưa sẵn sàng. Vui lòng thử lại sau vài giây.',
+                ephemeral: true
+            });
+            return;
+        }
+
         const query = interaction.options.getString('query', true);
         const channel = interaction.member?.voice?.channel;
 
@@ -48,9 +55,7 @@ module.exports = {
                         channel: interaction.channel
                     },
                     leaveOnEmpty: true,
-                    leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS,
-                    leaveOnEnd: true,
-                    leaveOnEndCooldown: LEAVE_ON_END_DELAY_MS
+                    leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS
                 }
             });
 
@@ -71,7 +76,8 @@ module.exports = {
             await interaction.editReply({ embeds: [queuedEmbed] });
         } catch (error) {
             console.error('Play command error:', error);
-            await interaction.editReply('Không thể phát nội dung này. Hãy thử link hoặc từ khóa khác.');
+            const reason = error?.message ? `\nChi tiết: ${error.message}` : '';
+            await interaction.editReply(`Không thể phát nội dung này. Hãy kiểm tra link/từ khóa và thử lại.${reason}`);
         }
     }
 };

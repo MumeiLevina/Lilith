@@ -23,10 +23,17 @@ const client = new Client({
 client.commands = new Collection();
 client.cooldowns = new Collection();
 client.player = new Player(client);
+client.musicReady = false;
 
-client.player.extractors.loadMulti(DefaultExtractors).catch(error => {
-    console.error('Failed to load music extractors:', error);
-});
+client.player.extractors.loadMulti(DefaultExtractors)
+    .then(() => {
+        client.musicReady = true;
+        console.log('Music extractors loaded successfully.');
+    })
+    .catch(error => {
+        client.musicReady = false;
+        console.error('Failed to load music extractors. Music commands will be unavailable.', error);
+    });
 
 client.player.events.on('connection', queue => {
     queue.metadata?.channel?.send(`🎧 Đã tham gia kênh voice **${queue.channel?.name || 'Unknown'}**.`);
@@ -61,7 +68,9 @@ client.player.events.on('playerStart', async (queue, track) => {
     }
 
     const message = await channel.send({ embeds: [nowPlayingEmbed], components: [controls] });
+    queue.metadata.controlsCollector?.stop('new_track');
     const collector = message.createMessageComponentCollector({ time: BUTTON_COLLECTOR_TIMEOUT_MS });
+    queue.metadata.controlsCollector = collector;
 
     collector.on('collect', async interaction => {
         if (!interaction.isButton()) return;
@@ -97,9 +106,16 @@ client.player.events.on('playerStart', async (queue, track) => {
             await interaction.reply({ content: '⏹️ Đã dừng nhạc và xóa hàng đợi.', ephemeral: true });
         }
     });
+
+    collector.on('end', () => {
+        if (queue.metadata?.controlsCollector === collector) {
+            delete queue.metadata.controlsCollector;
+        }
+    });
 });
 
 client.player.events.on('emptyQueue', queue => {
+    queue.metadata?.controlsCollector?.stop('queue_empty');
     queue.metadata?.channel?.send('✅ Hàng đợi trống, bot sẽ rời kênh voice.');
     queue.delete();
 });
