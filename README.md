@@ -80,6 +80,9 @@ npm run dev
 - `/settings delete_character` - Xóa nhân vật
 - `/settings language` - Đổi ngôn ngữ
 - `/settings personality` - Tùy chỉnh tính cách bot
+- `/play [query]` - Phát nhạc từ link hoặc từ khóa tìm kiếm
+- `/skip` - Bỏ qua bài hát đang phát
+- `/stop` - Dừng phát nhạc và xóa hàng đợi
 - `/help` - Hiển thị trợ giúp
 
 ## Phát triển tương lai
