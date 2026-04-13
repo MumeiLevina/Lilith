@@ -56,10 +56,11 @@ body {
 .logo {
   width: 100%;
   text-align: center;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 11px;
+  line-height: 1.3;
   font-family: 'Press Start 2P', monospace;
-  letter-spacing: 1px;
+  letter-spacing: 0.3px;
+  word-break: break-word;
 }
 
 .side-nav {
@@ -686,6 +687,7 @@ h3 {
 .queue-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
@@ -698,15 +700,17 @@ h3 {
 }
 
 .queue-favorite-btn {
-  width: 34px;
-  height: 34px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
-  font-size: 15px;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .queue-favorite-btn.is-active {
   background: #111;
-  color: #f2f2f2;
+  color: #f64f7d;
+  border-color: #111;
 }
 
 .queue-use-btn {

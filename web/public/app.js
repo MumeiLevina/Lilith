@@ -15,6 +15,7 @@ const skipBtn = document.getElementById('skipBtn');
 const stopBtn = document.getElementById('stopBtn');
 const seekForwardBtn = document.getElementById('seekForwardBtn');
 const loopBtn = document.getElementById('loopBtn');
+const homeNavBtn = document.getElementById('homeNavBtn');
 const favoritesNavBtn = document.getElementById('favoritesNavBtn');
 const saveCurrentBtn = document.getElementById('saveCurrentBtn');
 const genreChipButtons = Array.from(document.querySelectorAll('.chip-btn'));
@@ -274,7 +275,6 @@ function renderQueueList(state) {
             <p class="queue-meta">${safeDuration}</p>
           </div>
           <div class="queue-actions">
-            <button class="queue-use-btn" type="button" data-queue-use-index="${idx}">Use</button>
             <button
               class="queue-favorite-btn${favorited ? ' is-active' : ''}"
               type="button"
@@ -312,7 +312,6 @@ function renderFavoritesList() {
             <p class="queue-meta">${safeDuration} · ${safeSource}</p>
           </div>
           <div class="queue-actions">
-            <button class="queue-use-btn" type="button" data-favorite-use-index="${idx}">Use</button>
             <button
               class="queue-favorite-btn is-active"
               type="button"
@@ -328,6 +327,7 @@ function renderFavoritesList() {
 
 function setFavoritesView(active) {
   favoritesViewActive = !!active;
+  homeNavBtn?.classList.toggle('is-active', !favoritesViewActive);
   favoritesNavBtn?.classList.toggle('is-active', favoritesViewActive);
 
   if (favoritesViewActive) {
@@ -656,6 +656,11 @@ favoritesNavBtn?.addEventListener('click', () => {
   setStatus(favoritesViewActive ? 'Đang xem danh sách bài hát yêu thích.' : 'Đã quay lại hàng đợi hiện tại.');
 });
 
+homeNavBtn?.addEventListener('click', () => {
+  setFavoritesView(false);
+  setStatus('Đã quay lại danh sách phát hiện tại.');
+});
+
 queryInput.addEventListener('keydown', async (event) => {
   if (event.key !== 'Enter') return;
   event.preventDefault();
@@ -704,26 +709,6 @@ queueList?.addEventListener('click', (event) => {
     } else {
       setStatus(`Đã xóa khỏi yêu thích: ${result.track.title}`);
     }
-    return;
-  }
-
-  const queueUseButton = event.target.closest('[data-queue-use-index]');
-  if (queueUseButton) {
-    const index = Number(queueUseButton.dataset.queueUseIndex);
-    const track = latestState?.queue?.[index];
-    if (!track) return;
-
-    applySuggestionQuery(track.url || track.title || '', track.title || 'Track');
-    return;
-  }
-
-  const favoriteUseButton = event.target.closest('[data-favorite-use-index]');
-  if (favoriteUseButton) {
-    const index = Number(favoriteUseButton.dataset.favoriteUseIndex);
-    const track = favoriteTracks[index];
-    if (!track) return;
-
-    applySuggestionQuery(track.url || track.title || '', track.title || 'Track');
     return;
   }
 
