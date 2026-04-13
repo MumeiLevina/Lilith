@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { ensureDjPermission, ensureMusicReady, ensureSameVoiceChannel } = require('../utils/music');
+const { stop } = require('../utils/musicControl');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -20,6 +21,6 @@ module.exports = {
         }
 
         queue.delete();
-        await interaction.reply(' Đã dừng nhạc và xóa toàn bộ hàng đợi.');
+        await interaction.reply('⏹️ Đã dừng nhạc và xóa toàn bộ hàng đợi.');
     }
 };

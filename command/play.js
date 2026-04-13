@@ -1,25 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { ensureMusicReady } = require('../utils/music');
+const { play } = require('../utils/musicControl');
 
-const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
 const MAX_REPLY_LENGTH = 1900;
 const MAX_ERROR_DETAILS_LENGTH = 320;
-const YOUTUBE_HOSTS = new Set([
-    'youtube.com',
-    'www.youtube.com',
-    'm.youtube.com',
-    'music.youtube.com',
-    'youtu.be',
-    'www.youtu.be'
-]);
-const YOUTUBE_TRACKING_PARAMS = new Set([
-    'si',
-    'feature',
-    'pp',
-    'fbclid',
-    'gclid',
-    'igshid'
-]);
 const SOURCE_LABELS = {
     youtube: 'YouTube',
     spotify: 'Spotify',
@@ -31,89 +15,6 @@ const SOURCE_LABELS = {
 function getSourceLabel(source) {
     if (!source || typeof source !== 'string') return 'Không rõ';
     return SOURCE_LABELS[source] || source;
-}
-
-function normalizeQuery(rawQuery) {
-    const query = (rawQuery || '').trim();
-    if (!query) return query;
-
-    // Keep keyword searches unchanged.
-    if (!/^https?:\/\//i.test(query)) return query;
-
-    try {
-        const url = new URL(query);
-        const host = url.hostname.toLowerCase();
-
-        if (host === 'youtu.be') {
-            const videoId = url.pathname.split('/').filter(Boolean)[0];
-            const playlistId = url.searchParams.get('list');
-
-            if (videoId) {
-                if (playlistId) {
-                    return `https://www.youtube.com/watch?v=${videoId}&list=${playlistId}`;
-                }
-
-                return `https://www.youtube.com/watch?v=${videoId}`;
-            }
-
-            if (playlistId) {
-                return `https://www.youtube.com/playlist?list=${playlistId}`;
-            }
-        }
-
-        if (host.endsWith('youtube.com')) {
-            if (url.pathname === '/playlist') {
-                const playlistId = url.searchParams.get('list');
-                if (playlistId) {
-                    return `https://www.youtube.com/playlist?list=${playlistId}`;
-                }
-            }
-
-            if (url.pathname === '/watch') {
-                const videoId = url.searchParams.get('v');
-                const playlistId = url.searchParams.get('list');
-
-                if (videoId && playlistId) {
-                    return `https://www.youtube.com/watch?v=${videoId}&list=${playlistId}`;
-                }
-
-                if (videoId) {
-                    return `https://www.youtube.com/watch?v=${videoId}`;
-                }
-
-                if (playlistId) {
-                    return `https://www.youtube.com/playlist?list=${playlistId}`;
-                }
-            }
-        }
-
-        return query;
-    } catch {
-        return query;
-    }
-}
-
-function sanitizeYoutubeUrl(query) {
-    try {
-        const url = new URL(query.trim());
-        const hostname = url.hostname.toLowerCase();
-        if (!YOUTUBE_HOSTS.has(hostname)) return query;
-
-        const filteredParams = new URLSearchParams();
-        for (const [key, value] of url.searchParams.entries()) {
-            const lowerKey = key.toLowerCase();
-            const isTrackingParam = YOUTUBE_TRACKING_PARAMS.has(lowerKey) || lowerKey.startsWith('utm_');
-
-            if (!isTrackingParam) {
-                filteredParams.append(key, value);
-            }
-        }
-
-        url.search = filteredParams.toString();
-        return url.toString();
-    } catch {
-        return query;
-    }
 }
 
 function clampReplyText(content) {
@@ -182,8 +83,6 @@ module.exports = {
         if (!await ensureMusicReady(interaction)) return;
 
         const query = interaction.options.getString('query', true);
-        const normalizedQuery = normalizeQuery(query);
-        const playQuery = sanitizeYoutubeUrl(normalizedQuery);
         const channel = interaction.member?.voice?.channel;
 
         if (!channel) {
@@ -191,39 +90,15 @@ module.exports = {
             return;
         }
 
-        const botPermissions = channel.permissionsFor(interaction.guild.members.me);
-        if (
-            !botPermissions?.has(PermissionsBitField.Flags.Connect) ||
-            !botPermissions?.has(PermissionsBitField.Flags.Speak)
-        ) {
-            await sendValidationError('Bot cần quyền **Connect** và **Speak** trong voice channel này.');
-            return;
-        }
-
         try {
-            const playOptions = {
+            const { result } = await play({
+                client: interaction.client,
+                guildId: interaction.guildId,
+                query,
                 requestedBy: interaction.user,
-                nodeOptions: {
-                    metadata: {
-                        channel: interaction.channel
-                    },
-                    leaveOnEmpty: true,
-                    leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS
-                }
-            };
-
-            let result;
-            try {
-                result = await interaction.client.player.play(channel, playQuery, playOptions);
-            } catch (error) {
-                const shouldRetryWithOriginalQuery = error?.code === 'ERR_NO_RESULT' && playQuery !== query;
-                if (!shouldRetryWithOriginalQuery) {
-                    throw error;
-                }
-
-                result = await interaction.client.player.play(channel, query, playOptions);
-            }
-
+                channel,
+                metadataChannel: interaction.channel
+            });
             const searchResult = result.searchResult;
             const playlist = searchResult?.playlist;
             const queueWaitingCount = Number(result.queue?.tracks?.size) || 0;

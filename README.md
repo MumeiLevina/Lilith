@@ -53,6 +53,11 @@ cp .env.example .env
 - `DISCORD_CLIENT_ID`: Client ID của bot
 - `MONGODB_URI`: Connection string MongoDB
 - `OPENAI_API_KEY`: API key từ OpenAI
+- `DISCORD_CLIENT_SECRET`: Client secret cho OAuth2 dashboard
+- `DISCORD_OAUTH_REDIRECT_URI`: Callback URL OAuth2 (ví dụ `http://localhost:3000/auth/discord/callback`)
+- `SESSION_SECRET`: Secret để ký session cookie cho dashboard
+- `WEB_PORT`: Port web dashboard (mặc định `3000`)
+- `WEB_ORIGIN`: Origin frontend cho CORS (tuỳ chọn)
 
 ## Sử dụng
 
@@ -65,6 +70,9 @@ npm run deploy-commands
 ```bash
 npm start
 ```
+
+Sau khi bot chạy, truy cập dashboard tại:
+`http://localhost:3000/dashboard`
 
 3. Chạy ở chế độ development (auto-restart):
 ```bash
@@ -98,6 +106,27 @@ npm run dev
   - `DJ_ROLE_NAME=DJ`
   - `DJ_ROLE_ID=<discord_role_id>`
 - Thành viên có quyền `Administrator` hoặc `ManageGuild` có thể dùng lệnh DJ mà không cần role.
+
+## Web Dashboard (MVP)
+
+- Đăng nhập bằng Discord OAuth2 (`/auth/discord`)
+- API điều khiển nhạc:
+  - `POST /api/music/play`
+  - `POST /api/music/pause`
+  - `POST /api/music/resume`
+  - `POST /api/music/skip`
+  - `POST /api/music/stop`
+  - `GET /api/music/queue`
+  - `GET /api/music/now-playing`
+  - `POST /api/music/seek`
+  - `POST /api/music/volume`
+- Yêu cầu bảo mật:
+  - Phải đăng nhập Discord
+  - Phải vào cùng voice channel với bot
+  - Các lệnh điều khiển quan trọng yêu cầu quyền DJ/Admin
+  - Có CSRF token và rate limiting cơ bản
+- Realtime:
+  - Socket.IO đẩy trạng thái track, queue, progress lên dashboard
 
 ## Phát triển tương lai
 
