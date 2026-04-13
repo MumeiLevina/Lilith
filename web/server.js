@@ -117,6 +117,18 @@ function resolveGuildIdFromQueue(queue) {
     );
 }
 
+function isDiscordSnowflake(value) {
+    return typeof value === 'string' && /^\d{17,20}$/.test(value.trim());
+}
+
+function buildDashboardRedirectPath(guildId) {
+    if (!isDiscordSnowflake(guildId)) return '/dashboard';
+
+    const params = new URLSearchParams();
+    params.set('guildId', guildId.trim());
+    return `/dashboard?${params.toString()}`;
+}
+
 function createRateLimiter() {
     const buckets = new Map();
     return (req, res, next) => {
@@ -194,6 +206,11 @@ function setupWebServer(client) {
     const rateLimiter = createRateLimiter();
     const csrfProtectedMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+    // Required for secure session cookies when running behind reverse proxies (e.g. Render).
+    if (process.env.NODE_ENV === 'production') {
+        app.set('trust proxy', 1);
+    }
+
     app.use(createCorsMiddleware());
     app.use(express.json());
     app.use(sessionMiddleware);
@@ -261,7 +278,8 @@ function setupWebServer(client) {
         return result;
     }
 
-    async function resolveGuildContext(req) {
+    async function resolveGuildContext(req, options = {}) {
+        const { requireVoice = true } = options;
         const guildId = req.body?.guildId || req.query?.guildId;
         if (!guildId) throw createApiError(400, 'GUILD_REQUIRED', 'Thiếu guildId.');
         const guild = await client.guilds.fetch(guildId).catch(() => null);
@@ -269,20 +287,24 @@ function setupWebServer(client) {
         const member = await guild.members.fetch(req.session.user.id).catch(() => null);
         if (!member) throw createApiError(403, 'MEMBER_NOT_FOUND', 'Không tìm thấy thành viên trong server.');
         const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
-        const memberVoiceChannel = member.voice?.channel;
-        if (!memberVoiceChannel) {
-            throw createApiError(403, 'VOICE_REQUIRED', 'Bạn cần vào voice channel trước.');
-        }
-        const botVoiceChannelId = me?.voice?.channelId;
-        if (botVoiceChannelId && botVoiceChannelId !== member.voice.channelId) {
-            throw createApiError(403, 'VOICE_MISMATCH', 'Bạn cần ở cùng voice channel với bot.');
+        const memberVoiceChannel = member.voice?.channel || null;
+        const botVoiceChannelId = me?.voice?.channelId || null;
+
+        if (requireVoice) {
+            if (!memberVoiceChannel) {
+                throw createApiError(403, 'VOICE_REQUIRED', 'Bạn cần vào voice channel trước.');
+            }
+            if (botVoiceChannelId && botVoiceChannelId !== member.voice.channelId) {
+                throw createApiError(403, 'VOICE_MISMATCH', 'Bạn cần ở cùng voice channel với bot.');
+            }
         }
 
         return {
             guild,
             guildId: guild.id,
             member,
-            memberVoiceChannel
+            memberVoiceChannel,
+            botVoiceChannelId
         };
     }
 
@@ -316,7 +338,10 @@ function setupWebServer(client) {
 
     app.get('/auth/discord', (req, res) => {
         const state = randomToken();
+        const requestedGuildId = typeof req.query?.guildId === 'string' ? req.query.guildId : '';
+
         req.session.oauthState = state;
+        req.session.oauthReturnPath = buildDashboardRedirectPath(requestedGuildId);
 
         const params = new URLSearchParams({
             client_id: process.env.DISCORD_CLIENT_ID,
@@ -331,10 +356,15 @@ function setupWebServer(client) {
     app.get('/auth/discord/callback', async (req, res) => {
         try {
             const { code, state } = req.query;
+            const returnPath = typeof req.session.oauthReturnPath === 'string'
+                ? req.session.oauthReturnPath
+                : '/dashboard';
+
             if (!code || !state || state !== req.session.oauthState) {
                 throw createApiError(400, 'OAUTH_STATE_INVALID', 'OAuth state không hợp lệ.');
             }
             delete req.session.oauthState;
+            delete req.session.oauthReturnPath;
 
             const params = new URLSearchParams({
                 client_id: process.env.DISCORD_CLIENT_ID,
@@ -369,7 +399,7 @@ function setupWebServer(client) {
                 expiresAt: Date.now() + (Number(tokenData.expires_in || 3600) * 1000) - TOKEN_EXPIRY_BUFFER_MS
             };
             req.session.csrfToken = randomToken();
-            res.redirect('/dashboard');
+            res.redirect(returnPath);
         } catch (error) {
             const payload = error?.status ? error : createApiError(500, 'OAUTH_ERROR', error.message);
             sendApiError(res, payload);
@@ -419,9 +449,9 @@ function setupWebServer(client) {
         }
     });
 
-    async function runMusicAction(req, res, actionName, actionHandler, requireDj = true) {
+    async function runMusicAction(req, res, actionName, actionHandler, requireDj = true, requireVoice = true) {
         try {
-            const context = await resolveGuildContext(req);
+            const context = await resolveGuildContext(req, { requireVoice });
             if (requireDj && !hasDjPermission(context.member)) {
                 throw createApiError(403, 'DJ_REQUIRED', `Bạn cần role DJ hoặc quyền quản trị để dùng ${actionName}.`);
             }
@@ -510,13 +540,13 @@ function setupWebServer(client) {
     app.get('/api/music/queue', requireAuth, rateLimiter, ensureMusicReady, async (req, res) => {
         await runMusicAction(req, res, 'queue', async (context) => ({
             state: musicControl.createState(client, context.guildId)
-        }), false);
+        }), false, false);
     });
 
     app.get('/api/music/now-playing', requireAuth, rateLimiter, ensureMusicReady, async (req, res) => {
         await runMusicAction(req, res, 'now-playing', async (context) => ({
             state: musicControl.createState(client, context.guildId)
-        }), false);
+        }), false, false);
     });
 
     io.on('connection', socket => {

@@ -194,7 +194,14 @@ async function doMusicAction(path, body = {}) {
 }
 
 loginBtn.addEventListener('click', () => {
-  window.location.href = '/auth/discord';
+  const loginGuildId = currentGuildId || initialGuildId || guildSelect.value || '';
+  const loginUrl = new URL('/auth/discord', window.location.origin);
+
+  if (loginGuildId) {
+    loginUrl.searchParams.set('guildId', loginGuildId);
+  }
+
+  window.location.href = `${loginUrl.pathname}${loginUrl.search}`;
 });
 
 logoutBtn.addEventListener('click', async () => {
