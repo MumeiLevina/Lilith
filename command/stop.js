@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { ensureDjPermission, ensureMusicReady, ensureSameVoiceChannel } = require('../utils/music');
+const { stop } = require('../utils/musicControl');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,14 +13,11 @@ module.exports = {
         if (!await ensureSameVoiceChannel(interaction, 'dùng lệnh stop')) return;
         if (!await ensureDjPermission(interaction)) return;
 
-        const queue = interaction.client.player.nodes.get(interaction.guildId);
-
-        if (!queue || !queue.currentTrack) {
-            await interaction.reply({ content: 'Không có bài nào đang phát.', ephemeral: true });
-            return;
+        try {
+            stop(interaction.client, interaction.guildId);
+            await interaction.reply('⏹️ Đã dừng nhạc và xóa toàn bộ hàng đợi.');
+        } catch (error) {
+            await interaction.reply({ content: error.message, ephemeral: true });
         }
-
-        queue.delete();
-        await interaction.reply('⏹️ Đã dừng nhạc và xóa toàn bộ hàng đợi.');
     }
 };

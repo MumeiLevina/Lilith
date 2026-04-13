@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { ensureDjPermission, ensureMusicReady, ensureSameVoiceChannel } = require('../utils/music');
+const { skip } = require('../utils/musicControl');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,16 +13,11 @@ module.exports = {
         if (!await ensureSameVoiceChannel(interaction, 'skip')) return;
         if (!await ensureDjPermission(interaction)) return;
 
-        const queue = interaction.client.player.nodes.get(interaction.guildId);
-
-        if (!queue || !queue.currentTrack) {
-            await interaction.reply({ content: 'Hiện không có bài nào để skip.', ephemeral: true });
-            return;
+        try {
+            skip(interaction.client, interaction.guildId);
+            await interaction.reply('⏭️ Đã chuyển sang bài tiếp theo.');
+        } catch (error) {
+            await interaction.reply({ content: error.message, ephemeral: true });
         }
-
-        const skipped = queue.node.skip();
-        await interaction.reply(
-            skipped ? '⏭️ Đã chuyển sang bài tiếp theo.' : 'Không thể skip bài hiện tại.'
-        );
     }
 };
