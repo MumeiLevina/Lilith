@@ -537,6 +537,13 @@ function setupWebServer(client) {
         });
     });
 
+    app.post('/api/music/repeat', requireAuth, requireCsrf, rateLimiter, ensureMusicReady, async (req, res) => {
+        await runMusicAction(req, res, 'repeat', async (context) => {
+            const { state, repeatEnabled } = musicControl.toggleTrackRepeat(client, context.guildId);
+            return { state, repeatEnabled };
+        });
+    });
+
     app.get('/api/music/queue', requireAuth, rateLimiter, ensureMusicReady, async (req, res) => {
         await runMusicAction(req, res, 'queue', async (context) => ({
             state: musicControl.createState(client, context.guildId)

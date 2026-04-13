@@ -1,4 +1,5 @@
 const { PermissionsBitField } = require('discord.js');
+const { QueueRepeatMode } = require('discord-player');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
 const YOUTUBE_HOSTS = new Set([
@@ -102,6 +103,20 @@ function getQueue(client, guildId) {
     return client.player.nodes.get(guildId);
 }
 
+function repeatModeToKey(repeatMode) {
+    switch (Number(repeatMode)) {
+        case QueueRepeatMode.TRACK:
+            return 'track';
+        case QueueRepeatMode.QUEUE:
+            return 'queue';
+        case QueueRepeatMode.AUTOPLAY:
+            return 'autoplay';
+        case QueueRepeatMode.OFF:
+        default:
+            return 'off';
+    }
+}
+
 function createState(client, guildId) {
     const queue = getQueue(client, guildId);
     if (!queue || !queue.currentTrack) {
@@ -113,7 +128,8 @@ function createState(client, guildId) {
             progressBar: null,
             nowPlaying: null,
             queue: [],
-            queueSize: 0
+            queueSize: 0,
+            repeatMode: 'off'
         };
     }
 
@@ -126,7 +142,8 @@ function createState(client, guildId) {
         progressBar: queue.node.createProgressBar?.() || null,
         nowPlaying: toSerializableTrack(queue.currentTrack),
         queue: toTrackArray(queue).map(toSerializableTrack),
-        queueSize: Number(queue.tracks?.size) || toTrackArray(queue).length
+        queueSize: Number(queue.tracks?.size) || toTrackArray(queue).length,
+        repeatMode: repeatModeToKey(queue.repeatMode)
     };
 }
 
@@ -274,6 +291,27 @@ function setVolume(client, guildId, volume) {
     return createState(client, guildId);
 }
 
+function toggleTrackRepeat(client, guildId) {
+    const queue = getQueue(client, guildId);
+    if (!queue || !queue.currentTrack) {
+        const error = new Error('Không có bài nào đang phát.');
+        error.code = 'ERR_QUEUE_EMPTY';
+        throw error;
+    }
+
+    const currentMode = Number(queue.repeatMode);
+    const nextMode = currentMode === QueueRepeatMode.TRACK
+        ? QueueRepeatMode.OFF
+        : QueueRepeatMode.TRACK;
+
+    queue.setRepeatMode(nextMode);
+
+    return {
+        state: createState(client, guildId),
+        repeatEnabled: nextMode === QueueRepeatMode.TRACK
+    };
+}
+
 module.exports = {
     createState,
     getQueue,
@@ -285,6 +323,7 @@ module.exports = {
     setVolume,
     skip,
     stop,
+    toggleTrackRepeat,
     toSerializableTrack,
     toTrackArray
 };

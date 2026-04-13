@@ -13,7 +13,7 @@
         <div class="logo">Listen With Lilith</div>
         <nav class="side-nav">
           <button class="icon-btn active" type="button" aria-label="Home">⌂</button>
-          <button class="icon-btn" type="button" aria-label="Likes">❤</button>
+          <button id="favoritesNavBtn" class="icon-btn" type="button" aria-label="Favorites">❤</button>
           <button class="icon-btn" type="button" aria-label="Music">♪</button>
           <button class="icon-btn" type="button" aria-label="Discover">◎</button>
           <button class="icon-btn" type="button" aria-label="Tuning">┼</button>
@@ -54,6 +54,7 @@
             </div>
             <div class="meta-row">
               <span class="tag">Classic</span>
+              <button id="saveCurrentBtn" class="save-current-btn" type="button" aria-label="Save current track">♡ Save</button>
               <p id="statusText">Please login to continue.</p>
             </div>
 
@@ -64,11 +65,11 @@
             </div>
 
             <div class="controls">
-              <button id="stopBtn" class="control-btn" type="button" aria-label="Stop">↖</button>
-              <button id="skipBtn" class="control-btn" type="button" aria-label="Previous">◁</button>
+              <button id="stopBtn" class="control-btn" type="button" aria-label="Stop">⏹</button>
+              <button id="skipBtn" class="control-btn" type="button" aria-label="Skip">⏭</button>
               <button id="pauseBtn" class="control-btn control-main" type="button" aria-label="Pause">❚❚</button>
-              <button id="resumeBtn" class="control-btn" type="button" aria-label="Next">▷</button>
-              <button id="playBtn" class="control-btn" type="button" aria-label="Play">↻</button>
+              <button id="seekForwardBtn" class="control-btn" type="button" aria-label="Seek forward 10 seconds">▷</button>
+              <button id="loopBtn" class="control-btn" type="button" aria-label="Repeat current track">↻</button>
             </div>
 
             <div class="volume-row">
@@ -119,7 +120,7 @@
               </ul>
             </section>
 
-            <h3>Favorite Playlists</h3>
+            <h3 id="queueHeading">Favorite Playlists</h3>
             <ul id="queueList" class="queue-list">
               <li class="queue-empty">No tracks in queue</li>
             </ul>

@@ -3,28 +3,36 @@ const logoutBtn = document.getElementById('logoutBtn');
 const guildSelect = document.getElementById('guildSelect');
 const queryInput = document.getElementById('queryInput');
 const trackTitle = document.getElementById('trackTitle');
+const queueHeading = document.getElementById('queueHeading');
 const queueList = document.getElementById('queueList');
 const seekBar = document.getElementById('seekBar');
 const volumeInput = document.getElementById('volumeInput');
 const currentTime = document.getElementById('currentTime');
 const totalTime = document.getElementById('totalTime');
 const statusText = document.getElementById('statusText');
-const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
-const resumeBtn = document.getElementById('resumeBtn');
 const skipBtn = document.getElementById('skipBtn');
 const stopBtn = document.getElementById('stopBtn');
+const seekForwardBtn = document.getElementById('seekForwardBtn');
+const loopBtn = document.getElementById('loopBtn');
+const favoritesNavBtn = document.getElementById('favoritesNavBtn');
+const saveCurrentBtn = document.getElementById('saveCurrentBtn');
 const genreChipButtons = Array.from(document.querySelectorAll('.chip-btn'));
-const favoriteButtons = Array.from(document.querySelectorAll('.favorite-btn'));
+const categoryFavoriteButtons = Array.from(document.querySelectorAll('.favorite-btn'));
 const suggestionTitle = document.getElementById('suggestionTitle');
 const genreSuggestions = document.getElementById('genreSuggestions');
+
+const FAVORITES_STORAGE_KEY = 'lilith:favorites:v1';
+const initialGuildId = new URLSearchParams(window.location.search).get('guildId');
 
 let csrfToken = null;
 let socket = null;
 let currentGuildId = null;
 let authenticated = false;
-const initialGuildId = new URLSearchParams(window.location.search).get('guildId');
 let activeGenreKey = 'classic';
+let favoritesViewActive = false;
+let latestState = null;
+let favoriteTracks = loadFavorites();
 
 const GENRE_LABELS = {
   classic: 'Classic',
@@ -98,13 +106,89 @@ function normalizeGenre(rawGenre) {
   return GENRE_SUGGESTIONS[genre] ? genre : 'classic';
 }
 
+function loadFavorites() {
+  try {
+    const rawValue = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!rawValue) return [];
+
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(track => track && typeof track === 'object' && typeof track.key === 'string')
+      .slice(0, 200);
+  } catch {
+    return [];
+  }
+}
+
+function saveFavorites() {
+  try {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteTracks.slice(0, 200)));
+  } catch {
+    // Ignore quota/storage errors so playback controls still work.
+  }
+}
+
+function createTrackKey(track) {
+  const urlPart = String(track?.url || '').trim().toLowerCase();
+  if (urlPart) return `url:${urlPart}`;
+
+  const titlePart = String(track?.title || '').trim().toLowerCase();
+  const durationPart = String(track?.duration || '').trim();
+  return `title:${titlePart}|duration:${durationPart}`;
+}
+
+function toFavoriteTrack(track) {
+  return {
+    key: createTrackKey(track),
+    title: String(track?.title || 'Unknown track'),
+    duration: String(track?.duration || '0:00'),
+    durationMs: Number(track?.durationMs) || null,
+    url: String(track?.url || ''),
+    source: String(track?.source || ''),
+    requestedBy: String(track?.requestedBy || ''),
+    addedAt: Date.now()
+  };
+}
+
+function isTrackFavorited(track) {
+  const key = createTrackKey(track);
+  return favoriteTracks.some(item => item.key === key);
+}
+
+function toggleFavoriteTrack(track) {
+  const key = createTrackKey(track);
+  const existingIndex = favoriteTracks.findIndex(item => item.key === key);
+
+  if (existingIndex >= 0) {
+    const [removed] = favoriteTracks.splice(existingIndex, 1);
+    saveFavorites();
+    return { action: 'removed', track: removed };
+  }
+
+  const favoriteTrack = toFavoriteTrack(track);
+  favoriteTracks.unshift(favoriteTrack);
+  favoriteTracks = favoriteTracks.slice(0, 200);
+  saveFavorites();
+  return { action: 'added', track: favoriteTrack };
+}
+
+function applySuggestionQuery(query, title = 'Track') {
+  if (!query) return;
+  queryInput.value = query;
+  queryInput.focus();
+  queryInput.select();
+  setStatus(`Selected suggestion: ${title}`);
+}
+
 function updateGenreSelectionUi(genreKey) {
   genreChipButtons.forEach(button => {
     button.classList.toggle('is-active', button.dataset.genre === genreKey);
     button.classList.toggle('active', button.dataset.genre === genreKey);
   });
 
-  favoriteButtons.forEach(button => {
+  categoryFavoriteButtons.forEach(button => {
     button.classList.toggle('is-active', button.dataset.genre === genreKey);
   });
 }
@@ -149,13 +233,139 @@ function renderGenreSuggestions(genreKey) {
   }).join('');
 }
 
+function updateSaveCurrentButton(track) {
+  if (!saveCurrentBtn) return;
+
+  if (!track) {
+    saveCurrentBtn.disabled = true;
+    saveCurrentBtn.classList.remove('is-active');
+    saveCurrentBtn.textContent = '♡ Save';
+    return;
+  }
+
+  saveCurrentBtn.disabled = false;
+  const favorited = isTrackFavorited(track);
+  saveCurrentBtn.classList.toggle('is-active', favorited);
+  saveCurrentBtn.textContent = favorited ? '❤ Saved' : '♡ Save';
+}
+
+function renderQueueList(state) {
+  if (!queueHeading || !queueList) return;
+
+  queueHeading.textContent = 'Favorite Playlists';
+
+  if (!state?.queue?.length) {
+    queueList.innerHTML = '<li class="queue-empty">No tracks in queue</li>';
+    return;
+  }
+
+  queueList.innerHTML = state.queue
+    .slice(0, 20)
+    .map((track, idx) => {
+      const safeTitle = escapeHtml(track.title || 'Unknown track');
+      const safeDuration = escapeHtml(track.duration || '0:00');
+      const favorited = isTrackFavorited(track);
+
+      return `
+        <li class="queue-item">
+          <div class="queue-thumb" aria-hidden="true"></div>
+          <div>
+            <p class="queue-title">${idx + 1}. ${safeTitle}</p>
+            <p class="queue-meta">${safeDuration}</p>
+          </div>
+          <div class="queue-actions">
+            <button class="queue-use-btn" type="button" data-queue-use-index="${idx}">Use</button>
+            <button
+              class="queue-favorite-btn${favorited ? ' is-active' : ''}"
+              type="button"
+              data-queue-favorite-index="${idx}"
+              aria-label="Toggle favorite"
+            >${favorited ? '❤' : '♡'}</button>
+          </div>
+        </li>
+      `;
+    })
+    .join('');
+}
+
+function renderFavoritesList() {
+  if (!queueHeading || !queueList) return;
+
+  queueHeading.textContent = 'Saved Favorites';
+
+  if (!favoriteTracks.length) {
+    queueList.innerHTML = '<li class="queue-empty">Bạn chưa lưu bài hát yêu thích nào.</li>';
+    return;
+  }
+
+  queueList.innerHTML = favoriteTracks
+    .map((track, idx) => {
+      const safeTitle = escapeHtml(track.title || 'Unknown track');
+      const safeDuration = escapeHtml(track.duration || '0:00');
+      const safeSource = escapeHtml(track.source || 'Unknown source');
+
+      return `
+        <li class="queue-item">
+          <div class="queue-thumb" aria-hidden="true"></div>
+          <div>
+            <p class="queue-title">${idx + 1}. ${safeTitle}</p>
+            <p class="queue-meta">${safeDuration} · ${safeSource}</p>
+          </div>
+          <div class="queue-actions">
+            <button class="queue-use-btn" type="button" data-favorite-use-index="${idx}">Use</button>
+            <button
+              class="queue-favorite-btn is-active"
+              type="button"
+              data-favorite-remove-index="${idx}"
+              aria-label="Remove favorite"
+            >❤</button>
+          </div>
+        </li>
+      `;
+    })
+    .join('');
+}
+
+function setFavoritesView(active) {
+  favoritesViewActive = !!active;
+  favoritesNavBtn?.classList.toggle('is-active', favoritesViewActive);
+
+  if (favoritesViewActive) {
+    renderFavoritesList();
+    return;
+  }
+
+  renderQueueList(latestState);
+}
+
+function updateLoopButtonState(state) {
+  const repeatTrackEnabled = state?.repeatMode === 'track';
+  loopBtn?.classList.toggle('is-active', !!repeatTrackEnabled);
+}
+
+function updatePauseButtonState(state) {
+  if (!pauseBtn) return;
+
+  const paused = !!state?.paused;
+  pauseBtn.textContent = paused ? '▷' : '❚❚';
+  pauseBtn.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+}
+
 function renderState(state) {
+  latestState = state || null;
+
   if (!state || !state.active || !state.nowPlaying) {
     trackTitle.textContent = 'No track';
-    queueList.innerHTML = '<li class="queue-empty">No tracks in queue</li>';
     seekBar.value = 0;
     currentTime.textContent = '0:00';
     totalTime.textContent = '0:00';
+    updateSaveCurrentButton(null);
+    updatePauseButtonState({ paused: false });
+    updateLoopButtonState({ repeatMode: 'off' });
+
+    if (!favoritesViewActive) {
+      renderQueueList(state);
+    }
     return;
   }
 
@@ -166,26 +376,12 @@ function renderState(state) {
   currentTime.textContent = formatMs((Number(state.progressPercent || 0) / 100) * durationMs);
   volumeInput.value = Number(state.volume || 100);
 
-  if (!state.queue.length) {
-    queueList.innerHTML = '<li class="queue-empty">No tracks in queue</li>';
-  } else {
-    queueList.innerHTML = state.queue
-      .slice(0, 20)
-      .map((track, idx) => {
-        const safeTitle = escapeHtml(track.title || 'Unknown track');
-        const safeDuration = escapeHtml(track.duration || '0:00');
-        return `
-          <li class="queue-item">
-            <div class="queue-thumb" aria-hidden="true"></div>
-            <div>
-              <p class="queue-title">${idx + 1}. ${safeTitle}</p>
-              <p class="queue-meta">${safeDuration}</p>
-            </div>
-            <span class="queue-cta" aria-hidden="true">▶</span>
-          </li>
-        `;
-      })
-      .join('');
+  updateSaveCurrentButton(state.nowPlaying);
+  updatePauseButtonState(state);
+  updateLoopButtonState(state);
+
+  if (!favoritesViewActive) {
+    renderQueueList(state);
   }
 }
 
@@ -281,13 +477,72 @@ async function refreshState() {
 async function doMusicAction(path, body = {}) {
   if (!currentGuildId) {
     setStatus('Vui lòng chọn server.');
-    return;
+    return null;
   }
+
   const data = await api(path, {
     method: 'POST',
     body: JSON.stringify({ guildId: currentGuildId, ...body })
   });
-  if (data.state) renderState(data.state);
+
+  if (data.state) {
+    renderState(data.state);
+  }
+
+  return data;
+}
+
+async function requestPlayFromInput() {
+  try {
+    const query = queryInput.value.trim();
+    if (!query) {
+      setStatus('Nhập từ khóa hoặc URL trước khi phát.');
+      return;
+    }
+
+    await doMusicAction('/api/music/play', { query });
+    setStatus('Play request sent.');
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+async function seekByOffset(secondsOffset) {
+  try {
+    const state = latestState;
+    if (!state?.active || !state.nowPlaying) {
+      setStatus('Không có bài đang phát để tua.');
+      return;
+    }
+
+    const durationMs = Number(state.nowPlaying.durationMs || 0);
+    if (!durationMs) {
+      setStatus('Không thể tua bài này.');
+      return;
+    }
+
+    const currentMs = (Number(state.progressPercent || 0) / 100) * durationMs;
+    const targetMs = Math.max(0, Math.min(durationMs, currentMs + (Number(secondsOffset) * 1000)));
+    await doMusicAction('/api/music/seek', { seconds: targetMs / 1000 });
+    setStatus(`Đã tua ${secondsOffset > 0 ? '+' : ''}${Math.trunc(secondsOffset)} giây.`);
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+async function toggleRepeatTrack() {
+  try {
+    const data = await doMusicAction('/api/music/repeat');
+    if (!data) return;
+
+    if (data.repeatEnabled) {
+      setStatus('Đã bật lặp lại bài hiện tại.');
+    } else {
+      setStatus('Đã tắt lặp lại bài hiện tại.');
+    }
+  } catch (error) {
+    setStatus(error.message);
+  }
 }
 
 loginBtn.addEventListener('click', () => {
@@ -321,44 +576,98 @@ guildSelect.addEventListener('change', async (event) => {
     syncGuildQueryParam(null);
     return;
   }
+
   syncGuildQueryParam(currentGuildId);
   connectSocket();
   socket.emit('guild:subscribe', { guildId: currentGuildId });
   await refreshState();
 });
 
-playBtn.addEventListener('click', async () => {
+pauseBtn.addEventListener('click', async () => {
   try {
-    const query = queryInput.value.trim();
-    if (!query) {
-      setStatus('Nhập từ khóa hoặc URL trước khi Play.');
+    if (!latestState?.active || !latestState.nowPlaying) {
+      setStatus('Không có bài nào đang phát.');
       return;
     }
-    await doMusicAction('/api/music/play', { query });
-    setStatus('Play request sent.');
+
+    if (latestState.paused) {
+      await doMusicAction('/api/music/resume');
+      setStatus('Resumed.');
+      return;
+    }
+
+    await doMusicAction('/api/music/pause');
+    setStatus('Paused.');
   } catch (error) {
     setStatus(error.message);
   }
 });
 
-pauseBtn.addEventListener('click', async () => {
-  try { await doMusicAction('/api/music/pause'); setStatus('Paused.'); } catch (error) { setStatus(error.message); }
+seekForwardBtn.addEventListener('click', async () => {
+  await seekByOffset(10);
 });
-resumeBtn.addEventListener('click', async () => {
-  try { await doMusicAction('/api/music/resume'); setStatus('Resumed.'); } catch (error) { setStatus(error.message); }
-});
+
 skipBtn.addEventListener('click', async () => {
-  try { await doMusicAction('/api/music/skip'); setStatus('Skipped.'); } catch (error) { setStatus(error.message); }
+  try {
+    await doMusicAction('/api/music/skip');
+    setStatus('Skipped.');
+  } catch (error) {
+    setStatus(error.message);
+  }
 });
+
 stopBtn.addEventListener('click', async () => {
-  try { await doMusicAction('/api/music/stop'); setStatus('Stopped.'); } catch (error) { setStatus(error.message); }
+  try {
+    await doMusicAction('/api/music/stop');
+    setStatus('Stopped.');
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
+loopBtn.addEventListener('click', async () => {
+  await toggleRepeatTrack();
+});
+
+saveCurrentBtn?.addEventListener('click', () => {
+  if (!latestState?.active || !latestState.nowPlaying) {
+    setStatus('Không có bài nào để lưu yêu thích.');
+    return;
+  }
+
+  const result = toggleFavoriteTrack(latestState.nowPlaying);
+  updateSaveCurrentButton(latestState.nowPlaying);
+
+  if (favoritesViewActive) {
+    renderFavoritesList();
+  } else {
+    renderQueueList(latestState);
+  }
+
+  if (result.action === 'added') {
+    setStatus(`Đã thêm vào yêu thích: ${result.track.title}`);
+  } else {
+    setStatus(`Đã xóa khỏi yêu thích: ${result.track.title}`);
+  }
+});
+
+favoritesNavBtn?.addEventListener('click', () => {
+  setFavoritesView(!favoritesViewActive);
+  setStatus(favoritesViewActive ? 'Đang xem danh sách bài hát yêu thích.' : 'Đã quay lại hàng đợi hiện tại.');
+});
+
+queryInput.addEventListener('keydown', async (event) => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  await requestPlayFromInput();
 });
 
 seekBar.addEventListener('change', async () => {
   try {
-    const data = await api(`/api/music/now-playing?guildId=${encodeURIComponent(currentGuildId)}`);
-    const durationMs = Number(data.state?.nowPlaying?.durationMs || 0);
+    const state = latestState;
+    const durationMs = Number(state?.nowPlaying?.durationMs || 0);
     if (!durationMs) return;
+
     const targetSeconds = ((Number(seekBar.value) || 0) / 100) * (durationMs / 1000);
     await doMusicAction('/api/music/seek', { seconds: targetSeconds });
   } catch (error) {
@@ -375,13 +684,70 @@ volumeInput.addEventListener('change', async () => {
   }
 });
 
+queueList?.addEventListener('click', (event) => {
+  const favoriteIndexButton = event.target.closest('[data-queue-favorite-index]');
+  if (favoriteIndexButton) {
+    const index = Number(favoriteIndexButton.dataset.queueFavoriteIndex);
+    const track = latestState?.queue?.[index];
+    if (!track) return;
+
+    const result = toggleFavoriteTrack(track);
+    updateSaveCurrentButton(latestState?.nowPlaying || null);
+    if (favoritesViewActive) {
+      renderFavoritesList();
+    } else {
+      renderQueueList(latestState);
+    }
+
+    if (result.action === 'added') {
+      setStatus(`Đã thêm vào yêu thích: ${result.track.title}`);
+    } else {
+      setStatus(`Đã xóa khỏi yêu thích: ${result.track.title}`);
+    }
+    return;
+  }
+
+  const queueUseButton = event.target.closest('[data-queue-use-index]');
+  if (queueUseButton) {
+    const index = Number(queueUseButton.dataset.queueUseIndex);
+    const track = latestState?.queue?.[index];
+    if (!track) return;
+
+    applySuggestionQuery(track.url || track.title || '', track.title || 'Track');
+    return;
+  }
+
+  const favoriteUseButton = event.target.closest('[data-favorite-use-index]');
+  if (favoriteUseButton) {
+    const index = Number(favoriteUseButton.dataset.favoriteUseIndex);
+    const track = favoriteTracks[index];
+    if (!track) return;
+
+    applySuggestionQuery(track.url || track.title || '', track.title || 'Track');
+    return;
+  }
+
+  const favoriteRemoveButton = event.target.closest('[data-favorite-remove-index]');
+  if (favoriteRemoveButton) {
+    const index = Number(favoriteRemoveButton.dataset.favoriteRemoveIndex);
+    const track = favoriteTracks[index];
+    if (!track) return;
+
+    favoriteTracks.splice(index, 1);
+    saveFavorites();
+    updateSaveCurrentButton(latestState?.nowPlaying || null);
+    renderFavoritesList();
+    setStatus(`Đã xóa khỏi yêu thích: ${track.title}`);
+  }
+});
+
 genreChipButtons.forEach(button => {
   button.addEventListener('click', () => {
     renderGenreSuggestions(button.dataset.genre);
   });
 });
 
-favoriteButtons.forEach(button => {
+categoryFavoriteButtons.forEach(button => {
   button.addEventListener('click', () => {
     renderGenreSuggestions(button.dataset.genre);
   });
@@ -394,18 +760,16 @@ if (genreSuggestions) {
 
     const query = decodeURIComponent(targetButton.dataset.suggestionQuery || '');
     const title = decodeURIComponent(targetButton.dataset.suggestionTitle || 'track');
-    if (!query) return;
-
-    queryInput.value = query;
-    queryInput.focus();
-    queryInput.select();
-    setStatus(`Selected suggestion: ${title}`);
+    applySuggestionQuery(query, title);
   });
 }
 
 (async function boot() {
   try {
     renderGenreSuggestions(activeGenreKey);
+    renderFavoritesList();
+    setFavoritesView(false);
+    updateSaveCurrentButton(null);
     await loadAuth();
     await loadGuilds();
   } catch (error) {
