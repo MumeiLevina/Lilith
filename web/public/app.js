@@ -14,12 +14,53 @@ const pauseBtn = document.getElementById('pauseBtn');
 const resumeBtn = document.getElementById('resumeBtn');
 const skipBtn = document.getElementById('skipBtn');
 const stopBtn = document.getElementById('stopBtn');
+const genreChipButtons = Array.from(document.querySelectorAll('.chip-btn'));
+const favoriteButtons = Array.from(document.querySelectorAll('.favorite-btn'));
+const suggestionTitle = document.getElementById('suggestionTitle');
+const genreSuggestions = document.getElementById('genreSuggestions');
 
 let csrfToken = null;
 let socket = null;
 let currentGuildId = null;
 let authenticated = false;
 const initialGuildId = new URLSearchParams(window.location.search).get('guildId');
+let activeGenreKey = 'classic';
+
+const GENRE_LABELS = {
+  classic: 'Classic',
+  '90s': '90s',
+  new: 'New',
+  instrumental: 'Instrumental',
+  modern: 'Modern'
+};
+
+const GENRE_SUGGESTIONS = {
+  classic: [
+    { title: 'Canon in D', artist: 'Pachelbel', duration: '06:05', query: 'Canon in D Pachelbel' },
+    { title: 'Nocturne Op.9 No.2', artist: 'Chopin', duration: '04:32', query: 'Nocturne Op 9 No 2 Chopin' },
+    { title: 'Moonlight Sonata', artist: 'Beethoven', duration: '05:15', query: 'Moonlight Sonata Beethoven' }
+  ],
+  '90s': [
+    { title: 'Wonderwall', artist: 'Oasis', duration: '04:18', query: 'Oasis Wonderwall' },
+    { title: 'Linger', artist: 'The Cranberries', duration: '04:35', query: 'The Cranberries Linger' },
+    { title: 'Losing My Religion', artist: 'R.E.M.', duration: '04:29', query: 'REM Losing My Religion' }
+  ],
+  new: [
+    { title: 'Espresso', artist: 'Sabrina Carpenter', duration: '02:55', query: 'Sabrina Carpenter Espresso' },
+    { title: 'Birds of a Feather', artist: 'Billie Eilish', duration: '03:30', query: 'Billie Eilish Birds of a Feather' },
+    { title: 'Fortnight', artist: 'Taylor Swift', duration: '03:48', query: 'Taylor Swift Fortnight' }
+  ],
+  instrumental: [
+    { title: 'Time', artist: 'Hans Zimmer', duration: '04:35', query: 'Hans Zimmer Time' },
+    { title: 'A Sky Full of Stars Piano', artist: 'The Piano Guys', duration: '04:11', query: 'A Sky Full of Stars Piano' },
+    { title: 'Experience', artist: 'Ludovico Einaudi', duration: '05:15', query: 'Ludovico Einaudi Experience' }
+  ],
+  modern: [
+    { title: 'Blinding Lights', artist: 'The Weeknd', duration: '03:20', query: 'The Weeknd Blinding Lights' },
+    { title: 'Levitating', artist: 'Dua Lipa', duration: '03:23', query: 'Dua Lipa Levitating' },
+    { title: 'As It Was', artist: 'Harry Styles', duration: '02:47', query: 'Harry Styles As It Was' }
+  ]
+};
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -50,6 +91,62 @@ function syncGuildQueryParam(guildId) {
     url.searchParams.delete('guildId');
   }
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function normalizeGenre(rawGenre) {
+  const genre = String(rawGenre || '').trim().toLowerCase();
+  return GENRE_SUGGESTIONS[genre] ? genre : 'classic';
+}
+
+function updateGenreSelectionUi(genreKey) {
+  genreChipButtons.forEach(button => {
+    button.classList.toggle('is-active', button.dataset.genre === genreKey);
+    button.classList.toggle('active', button.dataset.genre === genreKey);
+  });
+
+  favoriteButtons.forEach(button => {
+    button.classList.toggle('is-active', button.dataset.genre === genreKey);
+  });
+}
+
+function renderGenreSuggestions(genreKey) {
+  if (!genreSuggestions || !suggestionTitle) return;
+
+  const normalizedGenre = normalizeGenre(genreKey);
+  activeGenreKey = normalizedGenre;
+  updateGenreSelectionUi(normalizedGenre);
+
+  const label = GENRE_LABELS[normalizedGenre] || GENRE_LABELS.classic;
+  suggestionTitle.textContent = `Suggested for ${label}`;
+
+  const suggestions = GENRE_SUGGESTIONS[normalizedGenre] || [];
+  if (!suggestions.length) {
+    genreSuggestions.innerHTML = '<li class="suggestion-empty">No recommendations for this category yet.</li>';
+    return;
+  }
+
+  genreSuggestions.innerHTML = suggestions.map((song, index) => {
+    const safeTitle = escapeHtml(song.title);
+    const safeArtist = escapeHtml(song.artist);
+    const safeDuration = escapeHtml(song.duration);
+    const encodedQuery = encodeURIComponent(song.query || song.title || '');
+    const encodedTitle = encodeURIComponent(song.title || 'Track');
+
+    return `
+      <li class="suggestion-item">
+        <div class="suggestion-main">
+          <p class="suggestion-track">${index + 1}. ${safeTitle}</p>
+          <p class="suggestion-meta">${safeArtist} · ${safeDuration}</p>
+        </div>
+        <button
+          class="suggestion-action"
+          type="button"
+          data-suggestion-query="${encodedQuery}"
+          data-suggestion-title="${encodedTitle}"
+        >Use</button>
+      </li>
+    `;
+  }).join('');
 }
 
 function renderState(state) {
@@ -278,8 +375,37 @@ volumeInput.addEventListener('change', async () => {
   }
 });
 
+genreChipButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    renderGenreSuggestions(button.dataset.genre);
+  });
+});
+
+favoriteButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    renderGenreSuggestions(button.dataset.genre);
+  });
+});
+
+if (genreSuggestions) {
+  genreSuggestions.addEventListener('click', event => {
+    const targetButton = event.target.closest('[data-suggestion-query]');
+    if (!targetButton) return;
+
+    const query = decodeURIComponent(targetButton.dataset.suggestionQuery || '');
+    const title = decodeURIComponent(targetButton.dataset.suggestionTitle || 'track');
+    if (!query) return;
+
+    queryInput.value = query;
+    queryInput.focus();
+    queryInput.select();
+    setStatus(`Selected suggestion: ${title}`);
+  });
+}
+
 (async function boot() {
   try {
+    renderGenreSuggestions(activeGenreKey);
     await loadAuth();
     await loadGuilds();
   } catch (error) {

@@ -10,7 +10,7 @@
   <div class="frame-wrap">
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="logo">MUSIC2D</div>
+        <div class="logo">Listen With Lilith</div>
         <nav class="side-nav">
           <button class="icon-btn active" type="button" aria-label="Home">⌂</button>
           <button class="icon-btn" type="button" aria-label="Likes">❤</button>
@@ -84,27 +84,40 @@
             </div>
 
             <div class="chips">
-              <span>Classic</span>
-              <span>90s</span>
-              <span>New</span>
-              <span>Instrumental</span>
-              <span>Modern</span>
+              <button class="chip-btn active" type="button" data-genre="classic">Classic</button>
+              <button class="chip-btn" type="button" data-genre="90s">90s</button>
+              <button class="chip-btn" type="button" data-genre="new">New</button>
+              <button class="chip-btn" type="button" data-genre="instrumental">Instrumental</button>
+              <button class="chip-btn" type="button" data-genre="modern">Modern</button>
             </div>
 
             <div class="hero-cards">
-              <article class="cover-card cover-a">
+              <article class="cover-card cover-a" data-genre="classic">
+                <button class="favorite-btn" type="button" data-genre="classic" aria-label="Show Classic suggestions">❤</button>
                 <h4>Daily Chaos</h4>
                 <p>by Emily Bryan</p>
               </article>
-              <article class="cover-card cover-b">
+              <article class="cover-card cover-b" data-genre="new">
+                <button class="favorite-btn" type="button" data-genre="new" aria-label="Show New suggestions">❤</button>
                 <h4>Simple Things</h4>
                 <p>by Ryan Poppin</p>
               </article>
-              <article class="cover-card cover-c">
+              <article class="cover-card cover-c" data-genre="modern">
+                <button class="favorite-btn" type="button" data-genre="modern" aria-label="Show Modern suggestions">❤</button>
                 <h4>Night Frames</h4>
                 <p>by Bryan Thomas</p>
               </article>
             </div>
+
+            <section class="suggestions-panel" aria-live="polite">
+              <div class="suggestions-head">
+                <h4 id="suggestionTitle">Suggested for Classic</h4>
+                <p>Tap a category or favorite icon to get music ideas.</p>
+              </div>
+              <ul id="genreSuggestions" class="suggestion-list">
+                <li class="suggestion-empty">Select a category to see recommendations.</li>
+              </ul>
+            </section>
 
             <h3>Favorite Playlists</h3>
             <ul id="queueList" class="queue-list">
