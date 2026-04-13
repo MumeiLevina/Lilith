@@ -35,7 +35,7 @@ function setStatus(text) {
 function renderState(state) {
   if (!state || !state.active || !state.nowPlaying) {
     trackTitle.textContent = 'No track';
-    queueList.innerHTML = '<li>Queue trống</li>';
+    queueList.innerHTML = '<li>Không có bài chờ</li>';
     seekBar.value = 0;
     currentTime.textContent = '0:00';
     totalTime.textContent = '0:00';
@@ -105,7 +105,7 @@ async function loadGuilds() {
   const { guilds } = await api('/api/guilds');
   guildSelect.innerHTML = guilds.length
     ? guilds.map(g => `<option value="${g.id}">${g.name}</option>`).join('')
-    : '<option value="">No shared guild</option>';
+    : '<option value="">Không có server chung</option>';
 
   currentGuildId = guilds[0]?.id || null;
   if (currentGuildId) {

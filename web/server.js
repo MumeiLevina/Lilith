@@ -155,6 +155,10 @@ function createCorsMiddleware() {
 }
 
 function createSessionMiddleware() {
+    if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+        throw new Error('SESSION_SECRET is required in production.');
+    }
+
     return session({
         name: SESSION_COOKIE_NAME,
         secret: process.env.SESSION_SECRET || 'lilith-dev-secret',
@@ -438,13 +442,16 @@ function setupWebServer(client) {
             const query = String(req.body?.query || '').trim();
             if (!query) throw createApiError(400, 'QUERY_REQUIRED', 'Thiếu query bài hát.');
 
+            const metadataChannel = context.guild.systemChannel
+                || context.guild.channels.cache.find(channel => typeof channel.isTextBased === 'function' && channel.isTextBased());
+
             const { result, state } = await musicControl.play({
                 client,
                 guildId: context.guildId,
                 query,
                 requestedBy: { username: req.session.user.username || req.session.user.id },
                 channel: context.memberVoiceChannel,
-                metadataChannel: context.guild.systemChannel || context.guild.channels.cache.find(channel => channel.isTextBased?.())
+                metadataChannel
             });
 
             return {

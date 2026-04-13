@@ -36,7 +36,8 @@ function normalizeQuery(rawQuery) {
             if (playlistId) return `https://www.youtube.com/playlist?list=${playlistId}`;
         }
 
-        if (host.endsWith('youtube.com')) {
+        const isYouTubeDomain = host === 'youtube.com' || host.endsWith('.youtube.com');
+        if (isYouTubeDomain) {
             if (url.pathname === '/playlist') {
                 const playlistId = url.searchParams.get('list');
                 if (playlistId) return `https://www.youtube.com/playlist?list=${playlistId}`;
