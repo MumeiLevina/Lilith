@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { ensureMusicReady } = require('../utils/music');
+const { createState } = require('../utils/musicControl');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,27 +11,25 @@ module.exports = {
     async execute(interaction) {
         if (!await ensureMusicReady(interaction)) return;
 
-        const queue = interaction.client.player.nodes.get(interaction.guildId);
-        if (!queue || !queue.currentTrack) {
+        const state = createState(interaction.client, interaction.guildId);
+        if (!state.active || !state.nowPlaying) {
             await interaction.reply({ content: 'Hiện không có bài nào đang phát.', ephemeral: true });
             return;
         }
 
-        const progress = queue.node.createProgressBar();
-        const timestamp = queue.node.getTimestamp();
         const embed = new EmbedBuilder()
             .setColor('#6FA8DC')
             .setTitle('🎧 Now Playing')
-            .setDescription(`**${queue.currentTrack.cleanTitle}**`)
+            .setDescription(`**${state.nowPlaying.title}**`)
             .addFields(
-                { name: 'Thời lượng', value: queue.currentTrack.duration || 'Không rõ', inline: true },
-                { name: 'Tiến trình', value: timestamp?.progress ? `${timestamp.progress}%` : 'N/A', inline: true },
-                { name: 'Queue', value: `${queue.tracks.size} bài chờ`, inline: true },
-                { name: 'Thanh tiến trình', value: progress || 'Không thể hiển thị progress bar.' }
+                { name: 'Thời lượng', value: state.nowPlaying.duration || 'Không rõ', inline: true },
+                { name: 'Tiến trình', value: `${state.progressPercent || 0}%`, inline: true },
+                { name: 'Queue', value: `${state.queueSize || 0} bài chờ`, inline: true },
+                { name: 'Thanh tiến trình', value: state.progressBar || 'Không thể hiển thị progress bar.' }
             );
 
-        if (queue.currentTrack.thumbnail) {
-            embed.setThumbnail(queue.currentTrack.thumbnail);
+        if (state.nowPlaying.thumbnail) {
+            embed.setThumbnail(state.nowPlaying.thumbnail);
         }
 
         await interaction.reply({ embeds: [embed] });

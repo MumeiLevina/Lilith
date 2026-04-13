@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lilith Music Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">MUSIC2D</div>
+      <nav>
+        <button class="icon-btn active">🏠</button>
+        <button class="icon-btn">❤</button>
+        <button class="icon-btn">♪</button>
+        <button class="icon-btn">⚙</button>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <input id="queryInput" type="text" placeholder="Search for songs, artists" />
+        <div class="top-actions">
+          <select id="guildSelect"></select>
+          <button id="loginBtn">Login with Discord</button>
+          <button id="logoutBtn" class="hidden">Logout</button>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="player-panel">
+          <div class="disc">●</div>
+          <h1 id="trackTitle">No track</h1>
+          <span class="tag">Classic</span>
+
+          <div class="timeline">
+            <span id="currentTime">0:00</span>
+            <input id="seekBar" type="range" min="0" max="100" value="0" />
+            <span id="totalTime">0:00</span>
+          </div>
+
+          <div class="controls">
+            <button id="playBtn">Play</button>
+            <button id="pauseBtn">Pause</button>
+            <button id="resumeBtn">Resume</button>
+            <button id="skipBtn">Skip</button>
+            <button id="stopBtn">Stop</button>
+          </div>
+
+          <div class="sub-controls">
+            <label>
+              Volume
+              <input id="volumeInput" type="range" min="0" max="200" value="100" />
+            </label>
+          </div>
+          <p id="statusText">Please login to continue.</p>
+        </div>
+
+        <div class="playlist-panel">
+          <h2>Music Categories</h2>
+          <div class="chips">
+            <span>Classic</span><span>90s</span><span>New</span><span>Instrumental</span>
+          </div>
+          <h3>Queue</h3>
+          <ul id="queueList"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/dashboard/app.js"></script>
+</body>
+</html>

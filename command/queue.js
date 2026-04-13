@@ -1,12 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { ensureMusicReady } = require('../utils/music');
-
-function toTrackArray(queue) {
-    if (typeof queue.tracks?.toArray === 'function') return queue.tracks.toArray();
-    if (typeof queue.tracks?.map === 'function') return queue.tracks.map(track => track);
-    if (queue.tracks && typeof queue.tracks[Symbol.iterator] === 'function') return Array.from(queue.tracks);
-    return [];
-}
+const { createState } = require('../utils/musicControl');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,28 +11,27 @@ module.exports = {
     async execute(interaction) {
         if (!await ensureMusicReady(interaction)) return;
 
-        const queue = interaction.client.player.nodes.get(interaction.guildId);
-        if (!queue || !queue.currentTrack) {
+        const state = createState(interaction.client, interaction.guildId);
+        if (!state.active || !state.nowPlaying) {
             await interaction.reply({ content: 'Hàng đợi đang trống.', ephemeral: true });
             return;
         }
 
-        const tracks = toTrackArray(queue);
-        const nextTracks = tracks.slice(0, 10);
+        const nextTracks = state.queue.slice(0, 10);
 
         const embed = new EmbedBuilder()
             .setColor('#F6B26B')
             .setTitle('📜 Hàng đợi phát nhạc')
             .addFields({
                 name: 'Đang phát',
-                value: `**${queue.currentTrack.cleanTitle}** (${queue.currentTrack.duration || 'Không rõ'})`
+                value: `**${state.nowPlaying.title}** (${state.nowPlaying.duration || 'Không rõ'})`
             });
 
         if (nextTracks.length > 0) {
             embed.addFields({
-                name: `Tiếp theo (${tracks.length} bài)`,
+                name: `Tiếp theo (${state.queue.length} bài)`,
                 value: nextTracks
-                    .map((track, index) => `${index + 1}. ${track.cleanTitle} (${track.duration || 'Không rõ'})`)
+                    .map((track, index) => `${index + 1}. ${track.title} (${track.duration || 'Không rõ'})`)
                     .join('\n')
             });
         } else {

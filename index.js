@@ -7,6 +7,7 @@ const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
 const { YoutubeExtractor } = require('discord-player-youtube');
 const { hasDjPermission } = require('./utils/music');
+const { setupWebServer } = require('./web/server');
 
 const BUTTON_COLLECTOR_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -156,6 +157,8 @@ client.player.events.on('playerError', (queue, error) => {
     console.error('Music player error:', error);
     queue?.metadata?.channel?.send('⚠️ Không thể phát bài hát này, đang thử bài kế tiếp.');
 });
+
+setupWebServer(client);
 
 function normalizeMongoUri(uri) {
     if (!uri || typeof uri !== 'string') return uri;
