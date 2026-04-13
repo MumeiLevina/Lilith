@@ -20,6 +20,6 @@ module.exports = {
         }
 
         queue.delete();
-        await interaction.reply('⏹️ Đã dừng nhạc và xóa toàn bộ hàng đợi.');
+        await interaction.reply(' Đã dừng nhạc và xóa toàn bộ hàng đợi.');
     }
 };
