@@ -11,6 +11,9 @@ const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const SESSION_COOKIE_NAME = 'lilith.sid';
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
+const TOKEN_EXPIRY_BUFFER_MS = 10_000;
+const PROGRESS_EMIT_INTERVAL_MS = 2000;
+const FORM_URLENCODED_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
 function randomToken() {
     return crypto.randomBytes(24).toString('hex');
@@ -59,7 +62,7 @@ async function refreshDiscordAccessToken(refreshToken) {
     const response = await fetch(`${DISCORD_API_BASE}/oauth2/token`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': FORM_URLENCODED_CONTENT_TYPE
         },
         body: params.toString()
     });
@@ -93,7 +96,7 @@ async function ensureAccessToken(req) {
         ...sessionState,
         accessToken: refreshed.access_token,
         refreshToken: refreshed.refresh_token || sessionState.refreshToken,
-        expiresAt: Date.now() + (Number(refreshed.expires_in || 3600) * 1000) - 10_000
+        expiresAt: Date.now() + (Number(refreshed.expires_in || 3600) * 1000) - TOKEN_EXPIRY_BUFFER_MS
     };
     await new Promise((resolve, reject) => req.session.save(err => (err ? reject(err) : resolve())));
     return req.session.discord.accessToken;
@@ -340,7 +343,7 @@ function setupWebServer(client) {
 
             const tokenResponse = await fetch(`${DISCORD_API_BASE}/oauth2/token`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: { 'Content-Type': FORM_URLENCODED_CONTENT_TYPE },
                 body: params.toString()
             });
             if (!tokenResponse.ok) {
@@ -360,7 +363,7 @@ function setupWebServer(client) {
             req.session.discord = {
                 accessToken: tokenData.access_token,
                 refreshToken: tokenData.refresh_token,
-                expiresAt: Date.now() + (Number(tokenData.expires_in || 3600) * 1000) - 10_000
+                expiresAt: Date.now() + (Number(tokenData.expires_in || 3600) * 1000) - TOKEN_EXPIRY_BUFFER_MS
             };
             req.session.csrfToken = randomToken();
             res.redirect('/dashboard');
@@ -578,7 +581,7 @@ function setupWebServer(client) {
         } catch (error) {
             console.error('Failed to emit progress tick:', error);
         }
-    }, 2000);
+    }, PROGRESS_EMIT_INTERVAL_MS);
 
     const port = Number(process.env.WEB_PORT) || 3000;
     server.listen(port, () => {

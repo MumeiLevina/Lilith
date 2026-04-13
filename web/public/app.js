@@ -71,7 +71,7 @@ async function api(path, options = {}) {
   }
 
   const response = await fetch(path, {
-    credentials: 'same-origin',
+    credentials: 'include',
     ...options,
     method,
     headers
