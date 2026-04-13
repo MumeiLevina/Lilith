@@ -156,7 +156,7 @@ function createCorsMiddleware() {
 
 function createSessionMiddleware() {
     if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-        throw new Error('SESSION_SECRET is required in production.');
+        throw new Error('SESSION_SECRET environment variable is required in production. Please set it to a secure random string.');
     }
 
     return session({
@@ -174,6 +174,10 @@ function createSessionMiddleware() {
 }
 
 function setupWebServer(client) {
+    if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.DISCORD_OAUTH_REDIRECT_URI) {
+        throw new Error('DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_OAUTH_REDIRECT_URI are required for dashboard OAuth2.');
+    }
+
     const app = express();
     const server = http.createServer(app);
     const io = new Server(server, {
@@ -305,10 +309,6 @@ function setupWebServer(client) {
     app.use('/dashboard', express.static(path.join(__dirname, 'public')));
 
     app.get('/auth/discord', (req, res) => {
-        if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.DISCORD_OAUTH_REDIRECT_URI) {
-            sendApiError(res, createApiError(500, 'OAUTH_NOT_CONFIGURED', 'OAuth2 chưa được cấu hình đầy đủ.'));
-            return;
-        }
         const state = randomToken();
         req.session.oauthState = state;
 
@@ -413,14 +413,14 @@ function setupWebServer(client) {
         }
     });
 
-    async function runMusicAction(req, res, actionName, action, requireDj = true) {
+    async function runMusicAction(req, res, actionName, actionHandler, requireDj = true) {
         try {
             const context = await resolveGuildContext(req);
             if (requireDj && !hasDjPermission(context.member)) {
                 throw createApiError(403, 'DJ_REQUIRED', `Bạn cần role DJ hoặc quyền quản trị để dùng ${actionName}.`);
             }
 
-            const result = await action(context);
+            const result = await actionHandler(context);
             audit(req, actionName, context.guildId);
             emitGuildState(context.guildId);
             res.json({
@@ -569,7 +569,7 @@ function setupWebServer(client) {
         emitGuildState(resolveGuildIdFromQueue(queue), 'music:queue_empty');
     });
 
-    setInterval(() => {
+    const progressInterval = setInterval(() => {
         try {
             for (const queue of client.player.nodes.cache.values()) {
                 const guildId = resolveGuildIdFromQueue(queue);
@@ -584,12 +584,14 @@ function setupWebServer(client) {
     server.listen(port, () => {
         console.log(`Web dashboard running at http://localhost:${port}/dashboard`);
     });
+    server.on('close', () => clearInterval(progressInterval));
 
     return {
         app,
         io,
         server,
-        emitGuildState
+        emitGuildState,
+        progressInterval
     };
 }
 

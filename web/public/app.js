@@ -131,6 +131,12 @@ function connectSocket() {
   socket.on('music:error', ({ message }) => setStatus(message || 'Music error'));
 }
 
+function disconnectSocket() {
+  if (!socket) return;
+  socket.disconnect();
+  socket = null;
+}
+
 async function refreshState() {
   if (!currentGuildId) return;
   const data = await api(`/api/music/now-playing?guildId=${encodeURIComponent(currentGuildId)}`);
@@ -155,11 +161,16 @@ loginBtn.addEventListener('click', () => {
 
 logoutBtn.addEventListener('click', async () => {
   try {
+    disconnectSocket();
     await api('/auth/logout', { method: 'POST' });
     window.location.reload();
   } catch (error) {
     setStatus(error.message);
   }
+});
+
+window.addEventListener('beforeunload', () => {
+  disconnectSocket();
 });
 
 guildSelect.addEventListener('change', async (event) => {

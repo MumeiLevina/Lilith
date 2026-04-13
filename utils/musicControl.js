@@ -28,7 +28,7 @@ function normalizeQuery(rawQuery) {
         const host = url.hostname.toLowerCase();
 
         if (host === 'youtu.be') {
-            const videoId = url.pathname.split('/').filter(Boolean)[0];
+            const videoId = url.pathname.replace(/^\/+/, '').split('/')[0];
             const playlistId = url.searchParams.get('list');
 
             if (videoId && playlistId) return `https://www.youtube.com/watch?v=${videoId}&list=${playlistId}`;
@@ -36,8 +36,7 @@ function normalizeQuery(rawQuery) {
             if (playlistId) return `https://www.youtube.com/playlist?list=${playlistId}`;
         }
 
-        const isYouTubeDomain = host === 'youtube.com' || host.endsWith('.youtube.com');
-        if (isYouTubeDomain) {
+        if (YOUTUBE_HOSTS.has(host)) {
             if (url.pathname === '/playlist') {
                 const playlistId = url.searchParams.get('list');
                 if (playlistId) return `https://www.youtube.com/playlist?list=${playlistId}`;
