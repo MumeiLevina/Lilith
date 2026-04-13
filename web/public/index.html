@@ -7,66 +7,113 @@
   <link rel="stylesheet" href="/dashboard/styles.css" />
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="logo">LILITH</div>
-      <nav>
-        <button class="icon-btn active">🏠</button>
-        <button class="icon-btn">❤</button>
-        <button class="icon-btn">♪</button>
-        <button class="icon-btn">⚙</button>
-      </nav>
-    </aside>
+  <div class="frame-wrap">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="logo">MUSIC2D</div>
+        <nav class="side-nav">
+          <button class="icon-btn active" type="button" aria-label="Home">⌂</button>
+          <button class="icon-btn" type="button" aria-label="Likes">❤</button>
+          <button class="icon-btn" type="button" aria-label="Music">♪</button>
+          <button class="icon-btn" type="button" aria-label="Discover">◎</button>
+          <button class="icon-btn" type="button" aria-label="Tuning">┼</button>
+        </nav>
+        <button class="icon-btn sidebar-foot" type="button" aria-label="Tag">◧</button>
+      </aside>
 
-    <main class="content">
-      <header class="topbar">
-        <input id="queryInput" type="text" placeholder="Search for songs, artists" />
-        <div class="top-actions">
-          <select id="guildSelect"></select>
-          <button id="loginBtn">Login with Discord</button>
-          <button id="logoutBtn" class="hidden">Logout</button>
-        </div>
-      </header>
-
-      <section class="grid">
-        <div class="player-panel">
-          <div class="disc">●</div>
-          <h1 id="trackTitle">No track</h1>
-          <span class="tag">Classic</span>
-
-          <div class="timeline">
-            <span id="currentTime">0:00</span>
-            <input id="seekBar" type="range" min="0" max="100" value="0" />
-            <span id="totalTime">0:00</span>
+      <main class="content">
+        <header class="topbar">
+          <label class="search-pill" for="queryInput">
+            <span>⌕</span>
+            <input id="queryInput" type="text" placeholder="Search for songs, artists" />
+          </label>
+          <div class="top-actions">
+            <select id="guildSelect" aria-label="Discord server"></select>
+            <button id="loginBtn" class="action-btn" type="button">Login with Discord</button>
+            <button id="logoutBtn" class="action-btn hidden" type="button">Logout</button>
           </div>
+        </header>
 
-          <div class="controls">
-            <button id="playBtn">Play</button>
-            <button id="pauseBtn">Pause</button>
-            <button id="resumeBtn">Resume</button>
-            <button id="skipBtn">Skip</button>
-            <button id="stopBtn">Stop</button>
-          </div>
+        <section class="dashboard-grid">
+          <section class="player-panel">
+            <div class="turntable">
+              <div class="record">
+                <div class="record-ring"></div>
+                <div class="record-center"></div>
+              </div>
+              <div class="tonearm">
+                <span class="arm-joint"></span>
+                <span class="arm-stem"></span>
+                <span class="arm-head"></span>
+              </div>
+            </div>
 
-          <div class="sub-controls">
-            <label>
-              Volume
+            <div class="track-row">
+              <h1 id="trackTitle">No track</h1>
+              <p class="likes">+392</p>
+            </div>
+            <div class="meta-row">
+              <span class="tag">Classic</span>
+              <p id="statusText">Please login to continue.</p>
+            </div>
+
+            <div class="timeline">
+              <span id="currentTime">0:00</span>
+              <input id="seekBar" type="range" min="0" max="100" value="0" />
+              <span id="totalTime">0:00</span>
+            </div>
+
+            <div class="controls">
+              <button id="stopBtn" class="control-btn" type="button" aria-label="Stop">↖</button>
+              <button id="skipBtn" class="control-btn" type="button" aria-label="Previous">◁</button>
+              <button id="pauseBtn" class="control-btn control-main" type="button" aria-label="Pause">❚❚</button>
+              <button id="resumeBtn" class="control-btn" type="button" aria-label="Next">▷</button>
+              <button id="playBtn" class="control-btn" type="button" aria-label="Play">↻</button>
+            </div>
+
+            <div class="volume-row">
+              <label for="volumeInput">Volume</label>
               <input id="volumeInput" type="range" min="0" max="200" value="100" />
-            </label>
-          </div>
-          <p id="statusText">Please login to continue.</p>
-        </div>
+            </div>
+          </section>
 
-        <div class="playlist-panel">
-          <h2>Music Categories</h2>
-          <div class="chips">
-            <span>Classic</span><span>90s</span><span>New</span><span>Instrumental</span>
-          </div>
-          <h3>Queue</h3>
-          <ul id="queueList"></ul>
-        </div>
-      </section>
-    </main>
+          <aside class="playlist-panel">
+            <div class="panel-head">
+              <h2>Music Categories</h2>
+              <a class="view-all" href="#">View all</a>
+            </div>
+
+            <div class="chips">
+              <span>Classic</span>
+              <span>90s</span>
+              <span>New</span>
+              <span>Instrumental</span>
+              <span>Modern</span>
+            </div>
+
+            <div class="hero-cards">
+              <article class="cover-card cover-a">
+                <h4>Daily Chaos</h4>
+                <p>by Emily Bryan</p>
+              </article>
+              <article class="cover-card cover-b">
+                <h4>Simple Things</h4>
+                <p>by Ryan Poppin</p>
+              </article>
+              <article class="cover-card cover-c">
+                <h4>Night Frames</h4>
+                <p>by Bryan Thomas</p>
+              </article>
+            </div>
+
+            <h3>Favorite Playlists</h3>
+            <ul id="queueList" class="queue-list">
+              <li class="queue-empty">No tracks in queue</li>
+            </ul>
+          </aside>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

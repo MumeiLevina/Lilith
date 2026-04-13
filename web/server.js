@@ -178,7 +178,10 @@ function createSessionMiddleware() {
 
 function setupWebServer(client) {
     if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.DISCORD_OAUTH_REDIRECT_URI) {
-        throw new Error('DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_OAUTH_REDIRECT_URI are required for dashboard OAuth2.');
+        console.warn(
+            'Web dashboard is disabled because DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, or DISCORD_OAUTH_REDIRECT_URI is missing.'
+        );
+        return null;
     }
 
     const app = express();

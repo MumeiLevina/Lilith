@@ -19,6 +19,16 @@ let csrfToken = null;
 let socket = null;
 let currentGuildId = null;
 let authenticated = false;
+const initialGuildId = new URLSearchParams(window.location.search).get('guildId');
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function formatMs(ms) {
   if (!ms || Number.isNaN(ms)) return '0:00';
@@ -32,10 +42,20 @@ function setStatus(text) {
   statusText.textContent = text;
 }
 
+function syncGuildQueryParam(guildId) {
+  const url = new URL(window.location.href);
+  if (guildId) {
+    url.searchParams.set('guildId', guildId);
+  } else {
+    url.searchParams.delete('guildId');
+  }
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 function renderState(state) {
   if (!state || !state.active || !state.nowPlaying) {
     trackTitle.textContent = 'No track';
-    queueList.innerHTML = '<li>Không có bài chờ</li>';
+    queueList.innerHTML = '<li class="queue-empty">No tracks in queue</li>';
     seekBar.value = 0;
     currentTime.textContent = '0:00';
     totalTime.textContent = '0:00';
@@ -50,11 +70,24 @@ function renderState(state) {
   volumeInput.value = Number(state.volume || 100);
 
   if (!state.queue.length) {
-    queueList.innerHTML = '<li>Không có bài chờ</li>';
+    queueList.innerHTML = '<li class="queue-empty">No tracks in queue</li>';
   } else {
     queueList.innerHTML = state.queue
       .slice(0, 20)
-      .map((track, idx) => `<li>${idx + 1}. ${track.title} <small>(${track.duration})</small></li>`)
+      .map((track, idx) => {
+        const safeTitle = escapeHtml(track.title || 'Unknown track');
+        const safeDuration = escapeHtml(track.duration || '0:00');
+        return `
+          <li class="queue-item">
+            <div class="queue-thumb" aria-hidden="true"></div>
+            <div>
+              <p class="queue-title">${idx + 1}. ${safeTitle}</p>
+              <p class="queue-meta">${safeDuration}</p>
+            </div>
+            <span class="queue-cta" aria-hidden="true">▶</span>
+          </li>
+        `;
+      })
       .join('');
   }
 }
@@ -107,11 +140,16 @@ async function loadGuilds() {
     ? guilds.map(g => `<option value="${g.id}">${g.name}</option>`).join('')
     : '<option value="">Không có server chung</option>';
 
-  currentGuildId = guilds[0]?.id || null;
+  const preferredGuild = guilds.find(g => g.id === initialGuildId);
+  currentGuildId = preferredGuild?.id || guilds[0]?.id || null;
   if (currentGuildId) {
+    guildSelect.value = currentGuildId;
+    syncGuildQueryParam(currentGuildId);
     connectSocket();
     socket.emit('guild:subscribe', { guildId: currentGuildId });
     await refreshState();
+  } else {
+    syncGuildQueryParam(null);
   }
 }
 
@@ -175,7 +213,11 @@ window.addEventListener('beforeunload', () => {
 
 guildSelect.addEventListener('change', async (event) => {
   currentGuildId = event.target.value;
-  if (!currentGuildId) return;
+  if (!currentGuildId) {
+    syncGuildQueryParam(null);
+    return;
+  }
+  syncGuildQueryParam(currentGuildId);
   connectSocket();
   socket.emit('guild:subscribe', { guildId: currentGuildId });
   await refreshState();

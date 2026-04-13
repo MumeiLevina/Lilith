@@ -1,9 +1,11 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ensureMusicReady } = require('../utils/music');
 const { play } = require('../utils/musicControl');
 
 const MAX_REPLY_LENGTH = 1900;
 const MAX_ERROR_DETAILS_LENGTH = 320;
+const DEFAULT_WEB_PORT = 3000;
+const DASHBOARD_PATH = '/dashboard';
 const SOURCE_LABELS = {
     youtube: 'YouTube',
     spotify: 'Spotify',
@@ -24,6 +26,52 @@ function clampReplyText(content) {
 
     if (content.length <= MAX_REPLY_LENGTH) return content;
     return `${content.slice(0, MAX_REPLY_LENGTH - 3)}...`;
+}
+
+function buildDashboardUrl(guildId) {
+    const configuredBase =
+        process.env.WEB_DASHBOARD_URL
+        || process.env.PUBLIC_DASHBOARD_URL
+        || process.env.WEB_ORIGIN
+        || `http://localhost:${Number(process.env.WEB_PORT) || DEFAULT_WEB_PORT}`;
+
+    if (!configuredBase || typeof configuredBase !== 'string') {
+        return null;
+    }
+
+    try {
+        const base = configuredBase.trim();
+        const normalizedBase = /\/dashboard\/?$/i.test(base)
+            ? base
+            : `${base.replace(/\/+$/, '')}${DASHBOARD_PATH}`;
+        const dashboardUrl = new URL(normalizedBase);
+
+        if (guildId) {
+            dashboardUrl.searchParams.set('guildId', guildId);
+        }
+
+        return dashboardUrl.toString();
+    } catch {
+        return null;
+    }
+}
+
+async function sendDashboardShortcut(interaction) {
+    const dashboardUrl = buildDashboardUrl(interaction.guildId);
+    if (!dashboardUrl) return;
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setLabel('Mở Dashboard Điều Khiển')
+            .setURL(dashboardUrl)
+            .setStyle(ButtonStyle.Link)
+    );
+
+    await interaction.followUp({
+        content: '🎛️ Điều khiển nhạc trên web dashboard:',
+        components: [row],
+        flags: MessageFlags.Ephemeral
+    });
 }
 
 function getUserFacingPlayError(error) {
@@ -123,6 +171,7 @@ module.exports = {
                 }
 
                 await interaction.editReply({ embeds: [playlistEmbed] });
+                await sendDashboardShortcut(interaction);
                 return;
             }
 
@@ -151,6 +200,7 @@ module.exports = {
             }
 
             await interaction.editReply({ embeds: [queuedEmbed] });
+            await sendDashboardShortcut(interaction);
         } catch (error) {
             console.error('Play command error:', error);
             const safeMessage = clampReplyText(getUserFacingPlayError(error));
