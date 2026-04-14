@@ -58,6 +58,7 @@ cp .env.example .env
 - `SESSION_SECRET`: Secret để ký session cookie cho dashboard
 - `WEB_PORT`: Port web dashboard (mặc định `3000`)
 - `WEB_ORIGIN`: Origin frontend cho CORS (tuỳ chọn)
+- `WEB_DASHBOARD_URL`: URL public của dashboard để bot gửi link đúng domain (tuỳ chọn, ưu tiên cao nhất)
 
 ## Sử dụng
 
@@ -97,6 +98,10 @@ npm run dev
 - `/stop` - Dừng phát nhạc và xóa hàng đợi
 - `/loop [mode]` - Chế độ lặp: off/track/queue (DJ)
 - `/autoplay [state]` - Bật/tắt autoplay (DJ)
+- `/dashboard link [public]` - Lấy link vào music dashboard
+- `/dashboard grant [user]` - Cấp quyền dashboard cho bạn bè (DJ/Admin)
+- `/dashboard revoke [user]` - Thu hồi quyền dashboard của thành viên (DJ/Admin)
+- `/dashboard list` - Xem danh sách thành viên được cấp quyền dashboard (DJ/Admin)
 - `/help` - Hiển thị trợ giúp
 
 ### DJ Role cho lệnh điều khiển nhạc
@@ -122,8 +127,9 @@ npm run dev
   - `POST /api/music/volume`
 - Yêu cầu bảo mật:
   - Phải đăng nhập Discord
-  - Phải vào cùng voice channel với bot
-  - Các lệnh điều khiển quan trọng yêu cầu quyền DJ/Admin
+  - Chỉ DJ/Admin hoặc thành viên được cấp quyền qua `/dashboard grant` mới dùng được dashboard
+  - Phải vào cùng voice channel với bot để điều khiển playback
+  - Các lệnh điều khiển quan trọng yêu cầu quyền DJ/Admin hoặc quyền dashboard đã được cấp
   - Có CSRF token và rate limiting cơ bản
 - Realtime:
   - Socket.IO đẩy trạng thái track, queue, progress lên dashboard

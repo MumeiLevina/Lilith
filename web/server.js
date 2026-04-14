@@ -5,6 +5,7 @@ const express = require('express');
 const session = require('express-session');
 const { Server } = require('socket.io');
 const { hasDjPermission } = require('../utils/music');
+const { getCollaboratorSetByGuildIds, hasDashboardAccess } = require('../utils/dashboardAccess');
 const musicControl = require('../utils/musicControl');
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
@@ -253,6 +254,7 @@ function setupWebServer(client) {
         const sharedGuilds = client.guilds.cache
             .filter(guild => userGuildSet.has(guild.id))
             .map(guild => guild);
+        const collaboratorSetByGuildId = await getCollaboratorSetByGuildIds(sharedGuilds.map(guild => guild.id));
 
         const result = [];
         for (const guild of sharedGuilds) {
@@ -260,6 +262,15 @@ function setupWebServer(client) {
             try {
                 member = await guild.members.fetch(req.session.user.id);
             } catch {
+                continue;
+            }
+
+            const isDjOrAdmin = hasDjPermission(member);
+            const collaboratorSet = collaboratorSetByGuildId.get(guild.id) || new Set();
+            const isCollaborator = collaboratorSet.has(req.session.user.id);
+            const canControl = isDjOrAdmin || isCollaborator;
+
+            if (!canControl) {
                 continue;
             }
 
@@ -272,7 +283,8 @@ function setupWebServer(client) {
                 memberVoiceChannelName: member.voice?.channel?.name || null,
                 botVoiceChannelId: me?.voice?.channelId || null,
                 botVoiceChannelName: me?.voice?.channel?.name || null,
-                canControl: hasDjPermission(member)
+                canControl,
+                accessLevel: isDjOrAdmin ? 'dj' : 'collaborator'
             });
         }
         return result;
@@ -286,6 +298,12 @@ function setupWebServer(client) {
         if (!guild) throw createApiError(404, 'GUILD_NOT_FOUND', 'Không tìm thấy server.');
         const member = await guild.members.fetch(req.session.user.id).catch(() => null);
         if (!member) throw createApiError(403, 'MEMBER_NOT_FOUND', 'Không tìm thấy thành viên trong server.');
+
+        const canControl = await hasDashboardAccess(member, guild.id);
+        if (!canControl) {
+            throw createApiError(403, 'DASHBOARD_ACCESS_DENIED', 'Bạn chưa được cấp quyền dùng Music Dashboard trong server này.');
+        }
+
         const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
         const memberVoiceChannel = member.voice?.channel || null;
         const botVoiceChannelId = me?.voice?.channelId || null;
@@ -304,7 +322,8 @@ function setupWebServer(client) {
             guildId: guild.id,
             member,
             memberVoiceChannel,
-            botVoiceChannelId
+            botVoiceChannelId,
+            canControl
         };
     }
 
@@ -452,8 +471,8 @@ function setupWebServer(client) {
     async function runMusicAction(req, res, actionName, actionHandler, requireDj = true, requireVoice = true) {
         try {
             const context = await resolveGuildContext(req, { requireVoice });
-            if (requireDj && !hasDjPermission(context.member)) {
-                throw createApiError(403, 'DJ_REQUIRED', `Bạn cần role DJ hoặc quyền quản trị để dùng ${actionName}.`);
+            if (requireDj && !context.canControl) {
+                throw createApiError(403, 'DJ_REQUIRED', `Bạn cần role DJ/quản trị hoặc được cấp quyền dashboard để dùng ${actionName}.`);
             }
 
             const result = await actionHandler(context);
@@ -572,6 +591,16 @@ function setupWebServer(client) {
                 const guild = await client.guilds.fetch(guildId);
                 const member = await guild.members.fetch(sessionUser.id);
                 if (!member) return;
+
+                const canAccessDashboard = await hasDashboardAccess(member, guild.id);
+                if (!canAccessDashboard) {
+                    socket.emit('guild:error', {
+                        guildId,
+                        message: 'Bạn chưa được cấp quyền truy cập dashboard cho server này.'
+                    });
+                    return;
+                }
+
                 socket.join(`guild:${guildId}`);
                 socket.emit('music:state', {
                     guildId,

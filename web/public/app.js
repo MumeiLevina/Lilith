@@ -614,7 +614,7 @@ async function loadGuilds() {
   const { guilds } = await api('/api/guilds');
   guildSelect.innerHTML = guilds.length
     ? guilds.map(g => `<option value="${g.id}">${g.name}</option>`).join('')
-    : '<option value="">No shared servers found</option>';
+    : '<option value="">No accessible servers found</option>';
 
   const preferredGuild = guilds.find(g => g.id === initialGuildId);
   currentGuildId = preferredGuild?.id || guilds[0]?.id || null;
@@ -626,6 +626,7 @@ async function loadGuilds() {
     await refreshState();
   } else {
     syncGuildQueryParam(null);
+    setStatus('No accessible dashboard server. Ask DJ/Admin to grant access via /dashboard grant.');
   }
 }
 

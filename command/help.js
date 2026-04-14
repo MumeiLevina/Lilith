@@ -27,6 +27,8 @@ module.exports = {
                 { name: '`/stop`', value: 'Dừng phát nhạc và xóa hàng đợi' },
                 { name: '`/loop [mode]`', value: 'Đặt loop mode: off/track/queue (DJ)' },
                 { name: '`/autoplay [state]`', value: 'Bật/tắt autoplay khi hết queue (DJ)' },
+                { name: '`/dashboard link [public]`', value: 'Lấy link vào music dashboard cho server hiện tại' },
+                { name: '`/dashboard grant|revoke|list`', value: 'Quản lý bạn bè có quyền dùng dashboard (DJ/Admin)' },
                 { name: '`/help`', value: 'Hiển thị thông báo trợ giúp này' }
             )
             .addFields(
