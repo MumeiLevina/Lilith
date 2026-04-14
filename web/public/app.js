@@ -19,7 +19,6 @@ const homeNavBtn = document.getElementById('homeNavBtn');
 const favoritesNavBtn = document.getElementById('favoritesNavBtn');
 const saveCurrentBtn = document.getElementById('saveCurrentBtn');
 const genreChipButtons = Array.from(document.querySelectorAll('.chip-btn'));
-const categoryFavoriteButtons = Array.from(document.querySelectorAll('.favorite-btn'));
 const suggestionTitle = document.getElementById('suggestionTitle');
 const genreSuggestions = document.getElementById('genreSuggestions');
 
@@ -78,6 +77,14 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function decodeDatasetValue(value) {
+  try {
+    return decodeURIComponent(String(value || ''));
+  } catch {
+    return String(value || '');
+  }
 }
 
 function formatMs(ms) {
@@ -175,22 +182,24 @@ function toggleFavoriteTrack(track) {
   return { action: 'added', track: favoriteTrack };
 }
 
-function applySuggestionQuery(query, title = 'Track') {
-  if (!query) return;
-  queryInput.value = query;
-  queryInput.focus();
-  queryInput.select();
-  setStatus(`Selected suggestion: ${title}`);
+async function playTrackByQuery(query, title = 'Track') {
+  const normalizedQuery = String(query || '').trim();
+  if (!normalizedQuery) {
+    setStatus('Không tìm thấy nguồn phát cho bài này.');
+    return;
+  }
+
+  const result = await doMusicAction('/api/music/play', { query: normalizedQuery });
+  if (!result) return;
+
+  queryInput.value = normalizedQuery;
+  setStatus(`Đang phát: ${title}`);
 }
 
 function updateGenreSelectionUi(genreKey) {
   genreChipButtons.forEach(button => {
     button.classList.toggle('is-active', button.dataset.genre === genreKey);
     button.classList.toggle('active', button.dataset.genre === genreKey);
-  });
-
-  categoryFavoriteButtons.forEach(button => {
-    button.classList.toggle('is-active', button.dataset.genre === genreKey);
   });
 }
 
@@ -226,9 +235,10 @@ function renderGenreSuggestions(genreKey) {
         <button
           class="suggestion-action"
           type="button"
-          data-suggestion-query="${encodedQuery}"
-          data-suggestion-title="${encodedTitle}"
-        >Use</button>
+          data-suggestion-play-query="${encodedQuery}"
+          data-suggestion-play-title="${encodedTitle}"
+          aria-label="Play ${safeTitle}"
+        >&#9654;</button>
       </li>
     `;
   }).join('');
@@ -266,6 +276,8 @@ function renderQueueList(state) {
       const safeTitle = escapeHtml(track.title || 'Unknown track');
       const safeDuration = escapeHtml(track.duration || '0:00');
       const favorited = isTrackFavorited(track);
+      const encodedQuery = encodeURIComponent(String(track.url || track.title || ''));
+      const encodedTitle = encodeURIComponent(String(track.title || 'Track'));
 
       return `
         <li class="queue-item">
@@ -275,6 +287,13 @@ function renderQueueList(state) {
             <p class="queue-meta">${safeDuration}</p>
           </div>
           <div class="queue-actions">
+            <button
+              class="queue-play-btn"
+              type="button"
+              data-queue-play-query="${encodedQuery}"
+              data-queue-play-title="${encodedTitle}"
+              aria-label="Play ${safeTitle}"
+            >&#9654;</button>
             <button
               class="queue-favorite-btn${favorited ? ' is-active' : ''}"
               type="button"
@@ -303,6 +322,8 @@ function renderFavoritesList() {
       const safeTitle = escapeHtml(track.title || 'Unknown track');
       const safeDuration = escapeHtml(track.duration || '0:00');
       const safeSource = escapeHtml(track.source || 'Unknown source');
+      const encodedQuery = encodeURIComponent(String(track.url || track.title || ''));
+      const encodedTitle = encodeURIComponent(String(track.title || 'Track'));
 
       return `
         <li class="queue-item">
@@ -312,6 +333,13 @@ function renderFavoritesList() {
             <p class="queue-meta">${safeDuration} · ${safeSource}</p>
           </div>
           <div class="queue-actions">
+            <button
+              class="queue-play-btn"
+              type="button"
+              data-favorite-play-query="${encodedQuery}"
+              data-favorite-play-title="${encodedTitle}"
+              aria-label="Play ${safeTitle}"
+            >&#9654;</button>
             <button
               class="queue-favorite-btn is-active"
               type="button"
@@ -689,7 +717,31 @@ volumeInput.addEventListener('change', async () => {
   }
 });
 
-queueList?.addEventListener('click', (event) => {
+queueList?.addEventListener('click', async (event) => {
+  const queuePlayButton = event.target.closest('[data-queue-play-query]');
+  if (queuePlayButton) {
+    try {
+      const query = decodeDatasetValue(queuePlayButton.dataset.queuePlayQuery);
+      const title = decodeDatasetValue(queuePlayButton.dataset.queuePlayTitle) || 'Track';
+      await playTrackByQuery(query, title);
+    } catch (error) {
+      setStatus(error.message);
+    }
+    return;
+  }
+
+  const favoritePlayButton = event.target.closest('[data-favorite-play-query]');
+  if (favoritePlayButton) {
+    try {
+      const query = decodeDatasetValue(favoritePlayButton.dataset.favoritePlayQuery);
+      const title = decodeDatasetValue(favoritePlayButton.dataset.favoritePlayTitle) || 'Track';
+      await playTrackByQuery(query, title);
+    } catch (error) {
+      setStatus(error.message);
+    }
+    return;
+  }
+
   const favoriteIndexButton = event.target.closest('[data-queue-favorite-index]');
   if (favoriteIndexButton) {
     const index = Number(favoriteIndexButton.dataset.queueFavoriteIndex);
@@ -732,20 +784,18 @@ genreChipButtons.forEach(button => {
   });
 });
 
-categoryFavoriteButtons.forEach(button => {
-  button.addEventListener('click', () => {
-    renderGenreSuggestions(button.dataset.genre);
-  });
-});
-
 if (genreSuggestions) {
-  genreSuggestions.addEventListener('click', event => {
-    const targetButton = event.target.closest('[data-suggestion-query]');
+  genreSuggestions.addEventListener('click', async event => {
+    const targetButton = event.target.closest('[data-suggestion-play-query]');
     if (!targetButton) return;
 
-    const query = decodeURIComponent(targetButton.dataset.suggestionQuery || '');
-    const title = decodeURIComponent(targetButton.dataset.suggestionTitle || 'track');
-    applySuggestionQuery(query, title);
+    try {
+      const query = decodeDatasetValue(targetButton.dataset.suggestionPlayQuery);
+      const title = decodeDatasetValue(targetButton.dataset.suggestionPlayTitle) || 'Track';
+      await playTrackByQuery(query, title);
+    } catch (error) {
+      setStatus(error.message);
+    }
   });
 }
 
