@@ -5,6 +5,10 @@ const queryInput = document.getElementById('queryInput');
 const trackTitle = document.getElementById('trackTitle');
 const queueHeading = document.getElementById('queueHeading');
 const queueList = document.getElementById('queueList');
+const queuePagination = document.getElementById('queuePagination');
+const queuePrevBtn = document.getElementById('queuePrevBtn');
+const queueNextBtn = document.getElementById('queueNextBtn');
+const queuePageInfo = document.getElementById('queuePageInfo');
 const seekBar = document.getElementById('seekBar');
 const volumeInput = document.getElementById('volumeInput');
 const currentTime = document.getElementById('currentTime');
@@ -32,11 +36,14 @@ let currentGuildId = null;
 let authenticated = false;
 let activeGenreKey = 'classic';
 let favoritesViewActive = false;
+let queuePage = 1;
+let favoritesPage = 1;
 let latestState = null;
 let favoriteTracks = loadFavorites();
 
 const DEFAULT_SUGGESTION_HINT = 'Tap a category to get music ideas.';
 const SEARCH_RESULT_LIMIT = 8;
+const QUEUE_PAGE_SIZE = 5;
 
 const GENRE_LABELS = {
   classic: 'Classic',
@@ -101,6 +108,31 @@ function formatMs(ms) {
 
 function setStatus(text) {
   statusText.textContent = text;
+}
+
+function paginateItems(items, page, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+
+  return {
+    currentPage,
+    totalPages,
+    startIndex,
+    pageItems: items.slice(startIndex, startIndex + pageSize)
+  };
+}
+
+function updateQueuePagination(totalItems, currentPage, totalPages) {
+  if (!queuePagination || !queuePrevBtn || !queueNextBtn || !queuePageInfo) return;
+
+  const showPagination = totalItems > QUEUE_PAGE_SIZE;
+  queuePagination.classList.toggle('hidden', !showPagination);
+  if (!showPagination) return;
+
+  queuePageInfo.textContent = `Page ${currentPage} / ${totalPages}`;
+  queuePrevBtn.disabled = currentPage <= 1;
+  queueNextBtn.disabled = currentPage >= totalPages;
 }
 
 function syncGuildQueryParam(guildId) {
@@ -370,15 +402,20 @@ function renderQueueList(state) {
   if (!queueHeading || !queueList) return;
 
   queueHeading.textContent = 'Favorite Playlists';
+  const tracks = state?.queue || [];
 
-  if (!state?.queue?.length) {
+  if (!tracks.length) {
     queueList.innerHTML = '<li class="queue-empty">No tracks in queue</li>';
+    updateQueuePagination(0, 1, 1);
     return;
   }
 
-  queueList.innerHTML = state.queue
-    .slice(0, 20)
+  const { currentPage, totalPages, startIndex, pageItems } = paginateItems(tracks, queuePage, QUEUE_PAGE_SIZE);
+  queuePage = currentPage;
+
+  queueList.innerHTML = pageItems
     .map((track, idx) => {
+      const itemIndex = startIndex + idx;
       const safeTitle = escapeHtml(track.title || 'Unknown track');
       const safeDuration = escapeHtml(track.duration || '0:00');
       const favorited = isTrackFavorited(track);
@@ -389,7 +426,7 @@ function renderQueueList(state) {
         <li class="queue-item">
           <div class="queue-thumb" aria-hidden="true"></div>
           <div>
-            <p class="queue-title">${idx + 1}. ${safeTitle}</p>
+            <p class="queue-title">${itemIndex + 1}. ${safeTitle}</p>
             <p class="queue-meta">${safeDuration}</p>
           </div>
           <div class="queue-actions">
@@ -403,7 +440,7 @@ function renderQueueList(state) {
             <button
               class="queue-favorite-btn${favorited ? ' is-active' : ''}"
               type="button"
-              data-queue-favorite-index="${idx}"
+              data-queue-favorite-index="${itemIndex}"
               aria-label="Toggle favorite"
             >${favorited ? '❤' : '♡'}</button>
           </div>
@@ -411,20 +448,28 @@ function renderQueueList(state) {
       `;
     })
     .join('');
+
+  updateQueuePagination(tracks.length, currentPage, totalPages);
 }
 
 function renderFavoritesList() {
   if (!queueHeading || !queueList) return;
 
   queueHeading.textContent = 'Saved Favorites';
+  const tracks = favoriteTracks;
 
-  if (!favoriteTracks.length) {
+  if (!tracks.length) {
     queueList.innerHTML = '<li class="queue-empty">You have not saved any favorite tracks yet.</li>';
+    updateQueuePagination(0, 1, 1);
     return;
   }
 
-  queueList.innerHTML = favoriteTracks
+  const { currentPage, totalPages, startIndex, pageItems } = paginateItems(tracks, favoritesPage, QUEUE_PAGE_SIZE);
+  favoritesPage = currentPage;
+
+  queueList.innerHTML = pageItems
     .map((track, idx) => {
+      const itemIndex = startIndex + idx;
       const safeTitle = escapeHtml(track.title || 'Unknown track');
       const safeDuration = escapeHtml(track.duration || '0:00');
       const safeSource = escapeHtml(track.source || 'Unknown source');
@@ -435,7 +480,7 @@ function renderFavoritesList() {
         <li class="queue-item">
           <div class="queue-thumb" aria-hidden="true"></div>
           <div>
-            <p class="queue-title">${idx + 1}. ${safeTitle}</p>
+            <p class="queue-title">${itemIndex + 1}. ${safeTitle}</p>
             <p class="queue-meta">${safeDuration} · ${safeSource}</p>
           </div>
           <div class="queue-actions">
@@ -449,7 +494,7 @@ function renderFavoritesList() {
             <button
               class="queue-favorite-btn is-active"
               type="button"
-              data-favorite-remove-index="${idx}"
+              data-favorite-remove-index="${itemIndex}"
               aria-label="Remove favorite"
             >❤</button>
           </div>
@@ -457,6 +502,8 @@ function renderFavoritesList() {
       `;
     })
     .join('');
+
+  updateQueuePagination(tracks.length, currentPage, totalPages);
 }
 
 function setFavoritesView(active) {
@@ -465,10 +512,12 @@ function setFavoritesView(active) {
   favoritesNavBtn?.classList.toggle('is-active', favoritesViewActive);
 
   if (favoritesViewActive) {
+    favoritesPage = 1;
     renderFavoritesList();
     return;
   }
 
+  queuePage = 1;
   renderQueueList(latestState);
 }
 
@@ -824,6 +873,28 @@ volumeInput.addEventListener('change', async () => {
   } catch (error) {
     setStatus(error.message);
   }
+});
+
+queuePrevBtn?.addEventListener('click', () => {
+  if (favoritesViewActive) {
+    favoritesPage = Math.max(1, favoritesPage - 1);
+    renderFavoritesList();
+    return;
+  }
+
+  queuePage = Math.max(1, queuePage - 1);
+  renderQueueList(latestState);
+});
+
+queueNextBtn?.addEventListener('click', () => {
+  if (favoritesViewActive) {
+    favoritesPage += 1;
+    renderFavoritesList();
+    return;
+  }
+
+  queuePage += 1;
+  renderQueueList(latestState);
 });
 
 queueList?.addEventListener('click', async (event) => {

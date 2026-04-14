@@ -755,6 +755,49 @@ h3 {
   background: rgba(255, 255, 255, 0.32);
 }
 
+.queue-pagination {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#queuePageInfo {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #2f2f2f;
+  text-align: center;
+}
+
+.page-btn {
+  min-width: 94px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid #4f4f4f;
+  background: #efefef;
+  color: #1d1d1d;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-btn:hover,
+.page-btn:focus-visible {
+  background: #111;
+  color: #f3f3f3;
+  border-color: #111;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #efefef;
+  color: #1d1d1d;
+  border-color: #4f4f4f;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -857,5 +900,10 @@ h3 {
 
   .suggestion-action {
     justify-self: flex-end;
+  }
+
+  .queue-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
