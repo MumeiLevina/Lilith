@@ -189,7 +189,7 @@ function toggleFavoriteTrack(track) {
 async function playTrackByQuery(query, title = 'Track') {
   const normalizedQuery = String(query || '').trim();
   if (!normalizedQuery) {
-    setStatus('Không tìm thấy nguồn phát cho bài này.');
+    setStatus('No playable source found for this track.');
     return;
   }
 
@@ -419,7 +419,7 @@ function renderFavoritesList() {
   queueHeading.textContent = 'Saved Favorites';
 
   if (!favoriteTracks.length) {
-    queueList.innerHTML = '<li class="queue-empty">Bạn chưa lưu bài hát yêu thích nào.</li>';
+    queueList.innerHTML = '<li class="queue-empty">You have not saved any favorite tracks yet.</li>';
     return;
   }
 
@@ -565,7 +565,7 @@ async function loadGuilds() {
   const { guilds } = await api('/api/guilds');
   guildSelect.innerHTML = guilds.length
     ? guilds.map(g => `<option value="${g.id}">${g.name}</option>`).join('')
-    : '<option value="">Không có server chung</option>';
+    : '<option value="">No shared servers found</option>';
 
   const preferredGuild = guilds.find(g => g.id === initialGuildId);
   currentGuildId = preferredGuild?.id || guilds[0]?.id || null;
@@ -610,7 +610,7 @@ async function refreshState() {
 
 async function doMusicAction(path, body = {}) {
   if (!currentGuildId) {
-    setStatus('Vui lòng chọn server.');
+    setStatus('Please select a server.');
     return null;
   }
 
@@ -630,7 +630,7 @@ async function requestPlayFromInput() {
   try {
     const query = queryInput.value.trim();
     if (!query) {
-      setStatus('Nhập từ khóa hoặc URL trước khi phát.');
+      setStatus('Enter a keyword or URL before playing.');
       return;
     }
 
@@ -644,20 +644,20 @@ async function seekByOffset(secondsOffset) {
   try {
     const state = latestState;
     if (!state?.active || !state.nowPlaying) {
-      setStatus('Không có bài đang phát để tua.');
+      setStatus('No active track to seek.');
       return;
     }
 
     const durationMs = Number(state.nowPlaying.durationMs || 0);
     if (!durationMs) {
-      setStatus('Không thể tua bài này.');
+      setStatus('This track cannot be seeked.');
       return;
     }
 
     const currentMs = (Number(state.progressPercent || 0) / 100) * durationMs;
     const targetMs = Math.max(0, Math.min(durationMs, currentMs + (Number(secondsOffset) * 1000)));
     await doMusicAction('/api/music/seek', { seconds: targetMs / 1000 });
-    setStatus(`Đã tua ${secondsOffset > 0 ? '+' : ''}${Math.trunc(secondsOffset)} giây.`);
+    setStatus(`Seeked ${secondsOffset > 0 ? '+' : ''}${Math.trunc(secondsOffset)} seconds.`);
   } catch (error) {
     setStatus(error.message);
   }
@@ -669,9 +669,9 @@ async function toggleRepeatTrack() {
     if (!data) return;
 
     if (data.repeatEnabled) {
-      setStatus('Đã bật lặp lại bài hiện tại.');
+      setStatus('Repeat for the current track is on.');
     } else {
-      setStatus('Đã tắt lặp lại bài hiện tại.');
+      setStatus('Repeat for the current track is off.');
     }
   } catch (error) {
     setStatus(error.message);
@@ -719,7 +719,7 @@ guildSelect.addEventListener('change', async (event) => {
 pauseBtn.addEventListener('click', async () => {
   try {
     if (!latestState?.active || !latestState.nowPlaying) {
-      setStatus('Không có bài nào đang phát.');
+      setStatus('No track is currently playing.');
       return;
     }
 
@@ -764,7 +764,7 @@ loopBtn.addEventListener('click', async () => {
 
 saveCurrentBtn?.addEventListener('click', () => {
   if (!latestState?.active || !latestState.nowPlaying) {
-    setStatus('Không có bài nào để lưu yêu thích.');
+    setStatus('No active track to save as favorite.');
     return;
   }
 
@@ -778,20 +778,20 @@ saveCurrentBtn?.addEventListener('click', () => {
   }
 
   if (result.action === 'added') {
-    setStatus(`Đã thêm vào yêu thích: ${result.track.title}`);
+    setStatus(`Added to favorites: ${result.track.title}`);
   } else {
-    setStatus(`Đã xóa khỏi yêu thích: ${result.track.title}`);
+    setStatus(`Removed from favorites: ${result.track.title}`);
   }
 });
 
 favoritesNavBtn?.addEventListener('click', () => {
   setFavoritesView(!favoritesViewActive);
-  setStatus(favoritesViewActive ? 'Đang xem danh sách bài hát yêu thích.' : 'Đã quay lại hàng đợi hiện tại.');
+  setStatus(favoritesViewActive ? 'Viewing saved favorites.' : 'Back to current queue.');
 });
 
 homeNavBtn?.addEventListener('click', () => {
   setFavoritesView(false);
-  setStatus('Đã quay lại danh sách phát hiện tại.');
+  setStatus('Back to the current playlist.');
 });
 
 queryInput.addEventListener('keydown', async (event) => {
@@ -866,9 +866,9 @@ queueList?.addEventListener('click', async (event) => {
     }
 
     if (result.action === 'added') {
-      setStatus(`Đã thêm vào yêu thích: ${result.track.title}`);
+      setStatus(`Added to favorites: ${result.track.title}`);
     } else {
-      setStatus(`Đã xóa khỏi yêu thích: ${result.track.title}`);
+      setStatus(`Removed from favorites: ${result.track.title}`);
     }
     return;
   }
@@ -883,7 +883,7 @@ queueList?.addEventListener('click', async (event) => {
     saveFavorites();
     updateSaveCurrentButton(latestState?.nowPlaying || null);
     renderFavoritesList();
-    setStatus(`Đã xóa khỏi yêu thích: ${track.title}`);
+    setStatus(`Removed from favorites: ${track.title}`);
   }
 });
 

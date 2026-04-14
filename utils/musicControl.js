@@ -172,16 +172,8 @@ async function play({
     const playQuery = sanitizeYoutubeUrl(normalizedQuery);
     ensureVoicePermissions(channel, channel.guild.members.me);
 
-    if (playNow) {
-        const currentQueue = getQueue(client, guildId);
-        if (currentQueue) {
-            try {
-                currentQueue.delete();
-            } catch {
-                // If queue cannot be deleted, continue and let play handle the state.
-            }
-        }
-    }
+    const currentQueue = getQueue(client, guildId);
+    const hadActivePlayback = !!(currentQueue && currentQueue.currentTrack);
 
     const playOptions = {
         requestedBy,
@@ -201,6 +193,31 @@ async function play({
         const shouldRetryWithOriginalQuery = error?.code === 'ERR_NO_RESULT' && playQuery !== query;
         if (!shouldRetryWithOriginalQuery) throw error;
         result = await client.player.play(channel, query, playOptions);
+    }
+
+    if (playNow && hadActivePlayback) {
+        const queue = result.queue || getQueue(client, guildId);
+        const targetTrack = result.track || result.searchResult?.tracks?.[0] || null;
+
+        if (queue && targetTrack) {
+            let switched = false;
+
+            try {
+                switched = queue.node.jump(targetTrack);
+            } catch {
+                switched = false;
+            }
+
+            if (!switched) {
+                try {
+                    queue.removeTrack(targetTrack);
+                    queue.insertTrack(targetTrack, 0);
+                    switched = queue.node.skip();
+                } catch {
+                    // If fast-switch fails, keep default queue order and continue playback safely.
+                }
+            }
+        }
     }
 
     return {
