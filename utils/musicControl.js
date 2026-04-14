@@ -165,11 +165,23 @@ async function play({
     query,
     requestedBy,
     channel,
-    metadataChannel
+    metadataChannel,
+    playNow = false
 }) {
     const normalizedQuery = normalizeQuery(query);
     const playQuery = sanitizeYoutubeUrl(normalizedQuery);
     ensureVoicePermissions(channel, channel.guild.members.me);
+
+    if (playNow) {
+        const currentQueue = getQueue(client, guildId);
+        if (currentQueue) {
+            try {
+                currentQueue.delete();
+            } catch {
+                // If queue cannot be deleted, continue and let play handle the state.
+            }
+        }
+    }
 
     const playOptions = {
         requestedBy,

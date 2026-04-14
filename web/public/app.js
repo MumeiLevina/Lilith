@@ -20,6 +20,7 @@ const favoritesNavBtn = document.getElementById('favoritesNavBtn');
 const saveCurrentBtn = document.getElementById('saveCurrentBtn');
 const genreChipButtons = Array.from(document.querySelectorAll('.chip-btn'));
 const suggestionTitle = document.getElementById('suggestionTitle');
+const suggestionHint = document.getElementById('suggestionHint');
 const genreSuggestions = document.getElementById('genreSuggestions');
 
 const FAVORITES_STORAGE_KEY = 'lilith:favorites:v1';
@@ -33,6 +34,9 @@ let activeGenreKey = 'classic';
 let favoritesViewActive = false;
 let latestState = null;
 let favoriteTracks = loadFavorites();
+
+const DEFAULT_SUGGESTION_HINT = 'Tap a category to get music ideas.';
+const SEARCH_RESULT_LIMIT = 8;
 
 const GENRE_LABELS = {
   classic: 'Classic',
@@ -189,11 +193,110 @@ async function playTrackByQuery(query, title = 'Track') {
     return;
   }
 
-  const result = await doMusicAction('/api/music/play', { query: normalizedQuery });
+  const result = await doMusicAction('/api/music/play', { query: normalizedQuery, playNow: true });
   if (!result) return;
 
   queryInput.value = normalizedQuery;
   setStatus(`Đang phát: ${title}`);
+}
+
+function buildSearchCandidates() {
+  const candidates = [];
+  const seen = new Set();
+
+  const pushCandidate = (track, source = '') => {
+    if (!track) return;
+
+    const title = String(track.title || '').trim();
+    const artist = String(track.artist || '').trim();
+    const duration = String(track.duration || '').trim();
+    const query = String(track.query || track.url || title).trim();
+    if (!title && !query) return;
+
+    const key = `${query.toLowerCase()}|${title.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    candidates.push({
+      title: title || query,
+      artist,
+      duration,
+      query: query || title,
+      source: String(source || track.source || '').trim()
+    });
+  };
+
+  Object.values(GENRE_SUGGESTIONS).forEach(group => {
+    group.forEach(song => {
+      pushCandidate(song, 'Category');
+    });
+  });
+
+  favoriteTracks.forEach(track => {
+    pushCandidate(track, 'Favorite');
+  });
+
+  if (latestState?.nowPlaying) {
+    pushCandidate(latestState.nowPlaying, 'Now Playing');
+  }
+
+  (latestState?.queue || []).forEach(track => {
+    pushCandidate(track, 'Queue');
+  });
+
+  return candidates;
+}
+
+function renderSearchSuggestions(rawQuery) {
+  if (!genreSuggestions || !suggestionTitle) return;
+
+  const query = String(rawQuery || '').trim();
+  if (!query) {
+    renderGenreSuggestions(activeGenreKey);
+    return;
+  }
+
+  const normalizedQuery = query.toLowerCase();
+  const matches = buildSearchCandidates()
+    .filter(item => {
+      const haystack = `${item.title} ${item.artist} ${item.query} ${item.source}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    })
+    .slice(0, SEARCH_RESULT_LIMIT);
+
+  suggestionTitle.textContent = `Search: ${query}`;
+  if (suggestionHint) {
+    suggestionHint.textContent = 'Tap play to start immediately, or press Enter to play this query directly.';
+  }
+
+  if (!matches.length) {
+    genreSuggestions.innerHTML = `<li class="suggestion-empty">No quick match for \"${escapeHtml(query)}\". Press Enter to play this query directly.</li>`;
+    return;
+  }
+
+  genreSuggestions.innerHTML = matches.map((song, index) => {
+    const safeTitle = escapeHtml(song.title);
+    const metaParts = [song.artist, song.source, song.duration].filter(Boolean).map(escapeHtml);
+    const safeMeta = metaParts.join(' · ');
+    const encodedQuery = encodeURIComponent(song.query || song.title || query);
+    const encodedTitle = encodeURIComponent(song.title || query);
+
+    return `
+      <li class="suggestion-item">
+        <div class="suggestion-main">
+          <p class="suggestion-track">${index + 1}. ${safeTitle}</p>
+          <p class="suggestion-meta">${safeMeta || 'Suggested result'}</p>
+        </div>
+        <button
+          class="suggestion-action"
+          type="button"
+          data-suggestion-play-query="${encodedQuery}"
+          data-suggestion-play-title="${encodedTitle}"
+          aria-label="Play ${safeTitle}"
+        >&#9654;</button>
+      </li>
+    `;
+  }).join('');
 }
 
 function updateGenreSelectionUi(genreKey) {
@@ -212,6 +315,9 @@ function renderGenreSuggestions(genreKey) {
 
   const label = GENRE_LABELS[normalizedGenre] || GENRE_LABELS.classic;
   suggestionTitle.textContent = `Suggested for ${label}`;
+  if (suggestionHint) {
+    suggestionHint.textContent = DEFAULT_SUGGESTION_HINT;
+  }
 
   const suggestions = GENRE_SUGGESTIONS[normalizedGenre] || [];
   if (!suggestions.length) {
@@ -528,8 +634,7 @@ async function requestPlayFromInput() {
       return;
     }
 
-    await doMusicAction('/api/music/play', { query });
-    setStatus('Play request sent.');
+    await playTrackByQuery(query, query);
   } catch (error) {
     setStatus(error.message);
   }
@@ -693,6 +798,10 @@ queryInput.addEventListener('keydown', async (event) => {
   if (event.key !== 'Enter') return;
   event.preventDefault();
   await requestPlayFromInput();
+});
+
+queryInput.addEventListener('input', () => {
+  renderSearchSuggestions(queryInput.value);
 });
 
 seekBar.addEventListener('change', async () => {

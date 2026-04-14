@@ -476,6 +476,7 @@ function setupWebServer(client) {
     app.post('/api/music/play', requireAuth, requireCsrf, rateLimiter, ensureMusicReady, async (req, res) => {
         await runMusicAction(req, res, 'play', async (context) => {
             const query = String(req.body?.query || '').trim();
+            const playNow = Boolean(req.body?.playNow);
             if (!query) throw createApiError(400, 'QUERY_REQUIRED', 'Thiếu query bài hát.');
 
             const metadataChannel = context.guild.systemChannel
@@ -487,11 +488,13 @@ function setupWebServer(client) {
                 query,
                 requestedBy: { username: req.session.user.username || req.session.user.id },
                 channel: context.memberVoiceChannel,
-                metadataChannel
+                metadataChannel,
+                playNow
             });
 
             return {
                 state,
+                playNow,
                 searchResultType: result.searchResult?.playlist ? 'playlist' : 'track'
             };
         }, false);
