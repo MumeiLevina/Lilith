@@ -4,7 +4,7 @@ const { Readable, Transform } = require('node:stream');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
 const MUSIC_CONNECTION_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_CONNECTION_TIMEOUT_MS, 30_000);
-const MUSIC_BUFFERING_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_BUFFERING_TIMEOUT_MS, 4_000);
+const MUSIC_BUFFERING_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_BUFFERING_TIMEOUT_MS, 8_000);
 const MUSIC_PREBUFFER_BYTES = parsePositiveInt(process.env.MUSIC_PREBUFFER_BYTES, 768 * 1024);
 const MUSIC_PREBUFFER_MAX_WAIT_MS = parsePositiveInt(process.env.MUSIC_PREBUFFER_MAX_WAIT_MS, 2_500);
 const MUSIC_PREBUFFER_HIGH_WATER_MARK_BYTES = parsePositiveInt(

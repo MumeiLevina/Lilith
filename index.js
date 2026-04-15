@@ -18,14 +18,14 @@ function parsePositiveInt(value, fallback) {
 
 const MUSIC_CONNECTION_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_CONNECTION_TIMEOUT_MS, 30_000);
 const MUSIC_PROBE_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_PROBE_TIMEOUT_MS, 10_000);
-const YOUTUBE_TARGET_AUDIO_BITRATE = parsePositiveInt(process.env.YOUTUBE_TARGET_AUDIO_BITRATE, 64_000);
+const YOUTUBE_TARGET_AUDIO_BITRATE = parsePositiveInt(process.env.YOUTUBE_TARGET_AUDIO_BITRATE, 128_000);
 const YOUTUBE_MIN_AUDIO_BITRATE = Math.min(
-    parsePositiveInt(process.env.YOUTUBE_MIN_AUDIO_BITRATE, 48_000),
+    parsePositiveInt(process.env.YOUTUBE_MIN_AUDIO_BITRATE, 64_000),
     YOUTUBE_TARGET_AUDIO_BITRATE
 );
 const YOUTUBE_MAX_RETRIES = parsePositiveInt(process.env.YOUTUBE_MAX_RETRIES, 12);
 const YOUTUBE_STALL_DETECTION_MS = parsePositiveInt(process.env.YOUTUBE_STALL_DETECTION_MS, 12_000);
-const YOUTUBE_AUDIO_QUALITY = (process.env.YOUTUBE_AUDIO_QUALITY || 'MEDIUM').toUpperCase();
+const YOUTUBE_AUDIO_QUALITY = (process.env.YOUTUBE_AUDIO_QUALITY || 'HIGH').toUpperCase();
 
 function getYoutubeAudioCodecScore(mimeType) {
     if (!mimeType) return 0;

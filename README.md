@@ -60,15 +60,15 @@ cp .env.example .env
 - `WEB_ORIGIN`: Origin frontend cho CORS (tuỳ chọn)
 - `WEB_DASHBOARD_URL`: URL public của dashboard để bot gửi link đúng domain (tuỳ chọn, ưu tiên cao nhất)
 - `MUSIC_CONNECTION_TIMEOUT_MS`: Timeout kết nối voice/stream (mặc định `30000`)
-- `MUSIC_BUFFERING_TIMEOUT_MS`: Thời gian chờ buffer trước khi chuyển track (mặc định `4000`)
+- `MUSIC_BUFFERING_TIMEOUT_MS`: Thời gian chờ buffer trước khi chuyển track (mặc định `8000`)
 - `MUSIC_PREBUFFER_BYTES`: Số byte prebuffer vào RAM trước khi đẩy qua player (mặc định `786432`)
 - `MUSIC_PREBUFFER_MAX_WAIT_MS`: Thời gian chờ tối đa để prebuffer (mặc định `2500`)
 - `MUSIC_PREBUFFER_HIGH_WATER_MARK_BYTES`: Mức highWaterMark cho stream prebuffer (mặc định `524288`)
-- `YOUTUBE_MIN_AUDIO_BITRATE`: Bitrate tối thiểu ưu tiên cho YouTube (mặc định `48000`)
-- `YOUTUBE_TARGET_AUDIO_BITRATE`: Bitrate mục tiêu cho YouTube (mặc định `64000`)
+- `YOUTUBE_MIN_AUDIO_BITRATE`: Bitrate tối thiểu ưu tiên cho YouTube (mặc định `64000`)
+- `YOUTUBE_TARGET_AUDIO_BITRATE`: Bitrate mục tiêu cho YouTube (mặc định `128000`)
 - `YOUTUBE_MAX_RETRIES`: Số lần retry khi stream YouTube bị nghẽn (mặc định `12`)
 - `YOUTUBE_STALL_DETECTION_MS`: Ngưỡng phát hiện stream stall từ YouTube (mặc định `12000`)
-- `YOUTUBE_AUDIO_QUALITY`: Chất lượng SABR (`LOW`/`MEDIUM`/`HIGH`, mặc định `MEDIUM`)
+- `YOUTUBE_AUDIO_QUALITY`: Chất lượng SABR (`LOW`/`MEDIUM`/`HIGH`, mặc định `HIGH`)
 
 ## Sử dụng
 
