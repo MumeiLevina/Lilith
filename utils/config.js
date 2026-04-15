@@ -151,5 +151,5 @@ Cảm xúc:
   defaultPersonality: 'Lilith - một bản thể huyễn hoặc được sinh ra từ khát vọng cô đơn nhất của con người.',
   maxConversationLength: 20,
   geminiModel: 'gemini-2.5-flash',
-  clientId: process.env.CLIENT_ID
+  clientId: process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID
 };

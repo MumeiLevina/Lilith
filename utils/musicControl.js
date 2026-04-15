@@ -1,7 +1,16 @@
 const { PermissionsBitField } = require('discord.js');
 const { QueueRepeatMode } = require('discord-player');
+const { Readable, Transform } = require('node:stream');
 
 const LEAVE_ON_EMPTY_DELAY_MS = 60_000;
+const MUSIC_CONNECTION_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_CONNECTION_TIMEOUT_MS, 30_000);
+const MUSIC_BUFFERING_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_BUFFERING_TIMEOUT_MS, 4_000);
+const MUSIC_PREBUFFER_BYTES = parsePositiveInt(process.env.MUSIC_PREBUFFER_BYTES, 768 * 1024);
+const MUSIC_PREBUFFER_MAX_WAIT_MS = parsePositiveInt(process.env.MUSIC_PREBUFFER_MAX_WAIT_MS, 2_500);
+const MUSIC_PREBUFFER_HIGH_WATER_MARK_BYTES = parsePositiveInt(
+    process.env.MUSIC_PREBUFFER_HIGH_WATER_MARK_BYTES,
+    512 * 1024
+);
 const YOUTUBE_HOSTS = new Set([
     'youtube.com',
     'www.youtube.com',
@@ -18,6 +27,128 @@ const YOUTUBE_TRACKING_PARAMS = new Set([
     'gclid',
     'igshid'
 ]);
+
+function parsePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(String(value || ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+class StreamPrebufferTransformer extends Transform {
+    constructor({ prebufferBytes, maxWaitMs, highWaterMark }) {
+        super({ highWaterMark });
+        this.prebufferBytes = prebufferBytes;
+        this.bufferedChunks = [];
+        this.bufferedBytes = 0;
+        this.released = prebufferBytes <= 0;
+        this.releaseTimer = null;
+
+        if (!this.released && maxWaitMs > 0) {
+            this.releaseTimer = setTimeout(() => this.release(), maxWaitMs);
+            this.releaseTimer.unref?.();
+        }
+    }
+
+    release() {
+        if (this.released) return;
+        this.released = true;
+
+        if (this.releaseTimer) {
+            clearTimeout(this.releaseTimer);
+            this.releaseTimer = null;
+        }
+
+        for (const chunk of this.bufferedChunks) {
+            this.push(chunk);
+        }
+
+        this.bufferedChunks = [];
+        this.bufferedBytes = 0;
+    }
+
+    _transform(chunk, encoding, callback) {
+        if (this.released) {
+            this.push(chunk);
+            callback();
+            return;
+        }
+
+        const safeChunk = Buffer.isBuffer(chunk)
+            ? chunk
+            : Buffer.from(chunk, encoding === 'buffer' ? undefined : encoding);
+
+        this.bufferedChunks.push(safeChunk);
+        this.bufferedBytes += safeChunk.length;
+
+        if (this.bufferedBytes >= this.prebufferBytes) {
+            this.release();
+        }
+
+        callback();
+    }
+
+    _flush(callback) {
+        this.release();
+        callback();
+    }
+
+    _destroy(error, callback) {
+        if (this.releaseTimer) {
+            clearTimeout(this.releaseTimer);
+            this.releaseTimer = null;
+        }
+
+        this.bufferedChunks = [];
+        this.bufferedBytes = 0;
+        callback(error);
+    }
+}
+
+function wrapReadableWithPrebuffer(stream) {
+    if (!(stream instanceof Readable) || MUSIC_PREBUFFER_BYTES <= 0) {
+        return stream;
+    }
+
+    const prebufferStream = new StreamPrebufferTransformer({
+        prebufferBytes: MUSIC_PREBUFFER_BYTES,
+        maxWaitMs: MUSIC_PREBUFFER_MAX_WAIT_MS,
+        highWaterMark: MUSIC_PREBUFFER_HIGH_WATER_MARK_BYTES
+    });
+
+    stream.on('error', error => prebufferStream.destroy(error));
+    stream.pipe(prebufferStream);
+    return prebufferStream;
+}
+
+function applyStreamPrebuffer(extractedStream) {
+    if (!extractedStream || MUSIC_PREBUFFER_BYTES <= 0) {
+        return extractedStream;
+    }
+
+    if (extractedStream instanceof Readable) {
+        return wrapReadableWithPrebuffer(extractedStream);
+    }
+
+    if (
+        typeof extractedStream === 'object' &&
+        extractedStream.stream instanceof Readable
+    ) {
+        return {
+            ...extractedStream,
+            stream: wrapReadableWithPrebuffer(extractedStream.stream)
+        };
+    }
+
+    return extractedStream;
+}
+
+function applyQueuePlaybackTweaks(queue) {
+    if (!queue) return;
+
+    queue.options.bufferingTimeout = MUSIC_BUFFERING_TIMEOUT_MS;
+    queue.options.connectionTimeout = MUSIC_CONNECTION_TIMEOUT_MS;
+    queue.options.verifyFallbackStream = true;
+    queue.onStreamExtracted = async stream => applyStreamPrebuffer(stream);
+}
 
 function normalizeQuery(rawQuery) {
     const query = (rawQuery || '').trim();
@@ -175,6 +306,10 @@ async function play({
     const currentQueue = getQueue(client, guildId);
     const hadActivePlayback = !!(currentQueue && currentQueue.currentTrack);
 
+    if (currentQueue) {
+        applyQueuePlaybackTweaks(currentQueue);
+    }
+
     const playOptions = {
         requestedBy,
         nodeOptions: {
@@ -182,7 +317,11 @@ async function play({
                 channel: metadataChannel
             },
             leaveOnEmpty: true,
-            leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS
+            leaveOnEmptyCooldown: LEAVE_ON_EMPTY_DELAY_MS,
+            bufferingTimeout: MUSIC_BUFFERING_TIMEOUT_MS,
+            connectionTimeout: MUSIC_CONNECTION_TIMEOUT_MS,
+            verifyFallbackStream: true,
+            onStreamExtracted: async stream => applyStreamPrebuffer(stream)
         }
     };
 
@@ -195,8 +334,11 @@ async function play({
         result = await client.player.play(channel, query, playOptions);
     }
 
+    const activeQueue = result.queue || getQueue(client, guildId);
+    applyQueuePlaybackTweaks(activeQueue);
+
     if (playNow && hadActivePlayback) {
-        const queue = result.queue || getQueue(client, guildId);
+        const queue = activeQueue;
         const targetTrack = result.track || result.searchResult?.tracks?.[0] || null;
 
         if (queue && targetTrack) {

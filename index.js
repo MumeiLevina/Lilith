@@ -11,6 +11,70 @@ const { setupWebServer } = require('./web/server');
 
 const BUTTON_COLLECTOR_TIMEOUT_MS = 15 * 60 * 1000;
 
+function parsePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(String(value || ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const MUSIC_CONNECTION_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_CONNECTION_TIMEOUT_MS, 30_000);
+const MUSIC_PROBE_TIMEOUT_MS = parsePositiveInt(process.env.MUSIC_PROBE_TIMEOUT_MS, 10_000);
+const YOUTUBE_TARGET_AUDIO_BITRATE = parsePositiveInt(process.env.YOUTUBE_TARGET_AUDIO_BITRATE, 64_000);
+const YOUTUBE_MIN_AUDIO_BITRATE = Math.min(
+    parsePositiveInt(process.env.YOUTUBE_MIN_AUDIO_BITRATE, 48_000),
+    YOUTUBE_TARGET_AUDIO_BITRATE
+);
+const YOUTUBE_MAX_RETRIES = parsePositiveInt(process.env.YOUTUBE_MAX_RETRIES, 12);
+const YOUTUBE_STALL_DETECTION_MS = parsePositiveInt(process.env.YOUTUBE_STALL_DETECTION_MS, 12_000);
+const YOUTUBE_AUDIO_QUALITY = (process.env.YOUTUBE_AUDIO_QUALITY || 'MEDIUM').toUpperCase();
+
+function getYoutubeAudioCodecScore(mimeType) {
+    if (!mimeType) return 0;
+    if (mimeType.includes('opus')) return 3;
+    if (mimeType.includes('audio/webm')) return 2;
+    if (mimeType.includes('audio/mp4') || mimeType.includes('m4a')) return 1;
+    return 0;
+}
+
+function chooseYoutubeAudioFormat(formats) {
+    if (!Array.isArray(formats) || !formats.length) return undefined;
+
+    const candidates = formats
+        .filter(format => {
+            if (!format || typeof format !== 'object') return false;
+            const width = Number(format.width) || 0;
+            const height = Number(format.height) || 0;
+            const bitrate = Number(format.bitrate) || Number(format.averageBitrate) || 0;
+            return width === 0 && height === 0 && bitrate > 0;
+        })
+        .map(format => {
+            const bitrate = Number(format.bitrate) || Number(format.averageBitrate) || 0;
+            const mimeType = String(format.mimeType || '').toLowerCase();
+            const codecScore = getYoutubeAudioCodecScore(mimeType);
+            const aboveTargetPenalty = Math.max(0, bitrate - YOUTUBE_TARGET_AUDIO_BITRATE);
+            const belowMinimumPenalty = Math.max(0, YOUTUBE_MIN_AUDIO_BITRATE - bitrate);
+            const distancePenalty = Math.abs(YOUTUBE_TARGET_AUDIO_BITRATE - bitrate);
+
+            return {
+                format,
+                bitrate,
+                rank:
+                    (codecScore * 1_000_000)
+                    - (aboveTargetPenalty * 10)
+                    - (belowMinimumPenalty * 5)
+                    - distancePenalty
+            };
+        });
+
+    if (!candidates.length) return undefined;
+
+    candidates.sort((a, b) => {
+        if (b.rank !== a.rank) return b.rank - a.rank;
+        return b.bitrate - a.bitrate;
+    });
+
+    return candidates[0].format;
+}
+
 try {
     const ffmpegPath = require('ffmpeg-static');
     if (ffmpegPath && !process.env.FFMPEG_PATH) {
@@ -38,13 +102,25 @@ const client = new Client({
 // Collections
 client.commands = new Collection();
 client.cooldowns = new Collection();
-client.player = new Player(client);
+client.player = new Player(client, {
+    connectionTimeout: MUSIC_CONNECTION_TIMEOUT_MS,
+    probeTimeout: MUSIC_PROBE_TIMEOUT_MS
+});
 client.musicReady = false;
 
 client.player.extractors.loadMulti(DefaultExtractors)
     .then(() => client.player.extractors.register(YoutubeExtractor, {
         cookie: process.env.YOUTUBE_COOKIE,
-        filterAutoplayTracks: true
+        filterAutoplayTracks: true,
+        sabrPlaybackOptions: {
+            audioQuality: YOUTUBE_AUDIO_QUALITY,
+            preferWebM: true,
+            preferOpus: true,
+            preferMP4: true,
+            maxRetries: YOUTUBE_MAX_RETRIES,
+            stallDetectionMs: YOUTUBE_STALL_DETECTION_MS,
+            audioFormat: chooseYoutubeAudioFormat
+        }
     }))
     .then(() => {
         client.musicReady = true;
