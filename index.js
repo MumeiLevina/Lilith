@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
 const { Player } = require('discord-player');
-const { DefaultExtractors } = require('@discord-player/extractor');
+const { DefaultExtractors, SpotifyExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
 const { YoutubeExtractor } = require('discord-player-youtube');
 
 // ── YouTube Music Playlist Fix ──────────────────────────────────────────────
@@ -342,19 +342,24 @@ function buildSpotifyFallbackQueries(track) {
     if (title) textQueries.push(title);
     
     const fallbacks = [];
-    // First try all queries on YouTube
-    for (const q of textQueries) {
-        fallbacks.push({ query: q, searchEngine: 'youtubeSearch' });
-    }
-    // Then try all queries on SoundCloud as a fallback
+    // First try all queries on SoundCloud (Primary choice)
     for (const q of textQueries) {
         fallbacks.push({ query: q, searchEngine: 'soundcloudSearch' });
+    }
+    // Then try all queries on YouTube as a secondary fallback
+    for (const q of textQueries) {
+        fallbacks.push({ query: q, searchEngine: 'youtubeSearch' });
     }
     
     return fallbacks;
 }
 
 client.player.extractors.loadMulti(DefaultExtractors)
+    .then(() => client.player.extractors.register(SpotifyExtractor, {
+        clientId: process.env.DP_SPOTIFY_CLIENT_ID || null,
+        clientSecret: process.env.DP_SPOTIFY_CLIENT_SECRET || null,
+        bridgeProvider: SoundCloudExtractor // Ưu tiên SoundCloud làm nguồn bridge đầu tiên
+    }))
     .then(() => client.player.extractors.register(YoutubeExtractor, {
         cookie: process.env.YOUTUBE_COOKIE,
         filterAutoplayTracks: true,
