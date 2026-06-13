@@ -320,6 +320,7 @@ async function play({
 
     const playOptions = {
         requestedBy,
+        searchEngine: 'soundcloudSearch', // Force plain text queries to use SoundCloud
         nodeOptions: {
             metadata: {
                 channel: metadataChannel
@@ -333,11 +334,35 @@ async function play({
         }
     };
 
+    let finalQuery = playQuery;
+
+    // If it's a URL (like YouTube), the user wants us to prioritize SoundCloud streaming.
+    // For single tracks, we can extract the metadata and force a SoundCloud search instead.
+    if (/^https?:\/\//i.test(finalQuery)) {
+        try {
+            const preSearch = await client.player.search(finalQuery, { requestedBy, searchEngine: 'auto' });
+            if (preSearch.hasTracks() && !preSearch.hasPlaylist()) {
+                const track = preSearch.tracks[0];
+                // Only intercept YouTube tracks (Spotify is already bridged globally in index.js)
+                if (track.source === 'youtube') {
+                    // Extract title and author to search on SoundCloud
+                    const title = (track.cleanTitle || track.title || '').trim();
+                    const author = (track.author || '').split(',')[0].trim();
+                    if (title) {
+                        finalQuery = author ? `${author} ${title}` : title;
+                    }
+                }
+            }
+        } catch {
+            // If pre-search fails, just continue with the original query
+        }
+    }
+
     let result;
     try {
-        result = await client.player.play(channel, playQuery, playOptions);
+        result = await client.player.play(channel, finalQuery, playOptions);
     } catch (error) {
-        const shouldRetryWithOriginalQuery = error?.code === 'ERR_NO_RESULT' && playQuery !== query;
+        const shouldRetryWithOriginalQuery = error?.code === 'ERR_NO_RESULT' && finalQuery !== query;
         if (!shouldRetryWithOriginalQuery) throw error;
         result = await client.player.play(channel, query, playOptions);
     }
