@@ -324,6 +324,25 @@ client.player = new Player(client, {
 });
 client.musicReady = false;
 
+// ── Spotify Bridge: build fallback YouTube search queries from track metadata ──
+// discord-player's SpotifyExtractor only gets Spotify metadata, then searches
+// YouTube to actually stream. If the default query fails we try simpler ones.
+function buildSpotifyFallbackQueries(track) {
+    const title = (track.cleanTitle || track.title || '').trim();
+    // Extract artists: track.author may be "Artist1, Artist2" or just one name
+    const rawAuthor = (track.author || track.metadata?.artist || '').trim();
+    const firstArtist = rawAuthor.split(/,|feat\.?|ft\.?|&/i)[0].trim();
+
+    const queries = [];
+    // Strategy 1: clean title + first artist (shorter = better YouTube match)
+    if (title && firstArtist) queries.push(`${title} ${firstArtist}`);
+    // Strategy 2: full author + title (standard format)
+    if (title && rawAuthor && rawAuthor !== firstArtist) queries.push(`${rawAuthor} ${title}`);
+    // Strategy 3: title only (last resort)
+    if (title) queries.push(title);
+    return queries;
+}
+
 client.player.extractors.loadMulti(DefaultExtractors)
     .then(() => client.player.extractors.register(YoutubeExtractor, {
         cookie: process.env.YOUTUBE_COOKIE,
@@ -445,7 +464,65 @@ client.player.events.on('error', (queue, error) => {
     queue?.metadata?.channel?.send('⚠️ Đã xảy ra lỗi khi phát nhạc.');
 });
 
-client.player.events.on('playerError', (queue, error) => {
+// ── Smart playerError handler: retry Spotify tracks with fallback queries ──
+// When a Spotify track fails to bridge (ERR_NO_RESULT or stream error),
+// we try up to 3 progressively simpler YouTube search queries before giving up.
+client.player.events.on('playerError', async (queue, error, track) => {
+    const isSpotifyTrack = track?.source === 'spotify' || track?.url?.includes('spotify.com');
+    const isBridgeError = error?.code === 'ERR_NO_RESULT' ||
+        error?.message?.includes('No results') ||
+        error?.message?.includes('Could not extract stream');
+
+    if (isSpotifyTrack && isBridgeError && track) {
+        const fallbackQueries = buildSpotifyFallbackQueries(track);
+
+        for (const fallbackQuery of fallbackQueries) {
+            try {
+                console.log(`[Spotify bridge] Retrying "${track.cleanTitle || track.title}" with query: ${fallbackQuery}`);
+                const voiceChannel = queue.channel;
+                if (!voiceChannel) break;
+
+                const retryResult = await client.player.play(voiceChannel, fallbackQuery, {
+                    requestedBy: track.requestedBy,
+                    nodeOptions: {
+                        metadata: queue.metadata,
+                        leaveOnEmpty: true,
+                        leaveOnEmptyCooldown: 60_000,
+                        bufferingTimeout: parsePositiveInt(process.env.MUSIC_BUFFERING_TIMEOUT_MS, 12_000),
+                        connectionTimeout: MUSIC_CONNECTION_TIMEOUT_MS,
+                        verifyFallbackStream: true
+                    },
+                    // Insert at front of queue so it plays immediately after current retry
+                    seek: 0
+                });
+
+                if (retryResult?.track) {
+                    // Move the retried track to the front if something is already playing
+                    const currentQueue = client.player.nodes.get(queue.guild?.id || queue.guildId);
+                    if (currentQueue) {
+                        try {
+                            const tracks = currentQueue.tracks.toArray?.() ?? [];
+                            const retriedTrack = tracks[tracks.length - 1];
+                            if (retriedTrack) {
+                                currentQueue.removeTrack(retriedTrack);
+                                currentQueue.insertTrack(retriedTrack, 0);
+                            }
+                        } catch { /* ignore reorder errors */ }
+                    }
+                    console.log(`[Spotify bridge] Retry succeeded for "${track.cleanTitle || track.title}" using: ${fallbackQuery}`);
+                    return; // Success — don't fall through to the skip message
+                }
+            } catch (retryErr) {
+                console.warn(`[Spotify bridge] Retry query "${fallbackQuery}" failed:`, retryErr?.message);
+            }
+        }
+        // All fallbacks exhausted — notify and let discord-player skip naturally
+        console.error(`[Spotify bridge] All fallback queries exhausted for "${track?.cleanTitle || track?.title}".`);
+        queue?.metadata?.channel?.send(`⚠️ Không tìm thấy nguồn phát cho bài **${track?.cleanTitle || track?.title || 'Unknown'}** — đang bỏ qua.`);
+        return;
+    }
+
+    // Non-Spotify or non-bridge error — log and skip normally
     console.error('Music player error:', error);
     queue?.metadata?.channel?.send('⚠️ Không thể phát bài hát này, đang thử bài kế tiếp.');
 });
