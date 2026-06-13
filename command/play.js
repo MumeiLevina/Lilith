@@ -83,7 +83,19 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        await interaction.deferReply();
+        // Guard against DiscordAPIError[40060] if the interaction was already acknowledged
+        if (!interaction.deferred && !interaction.replied) {
+            try {
+                await interaction.deferReply();
+            } catch (deferError) {
+                // 40060 = already acknowledged, 10062 = unknown interaction (expired)
+                if (deferError?.code !== 40060 && deferError?.code !== 10062) {
+                    console.error('Failed to defer play interaction:', deferError);
+                }
+                // If we can't defer, bail out silently
+                if (deferError?.code === 10062) return;
+            }
+        }
 
         const sendValidationError = async (message) => {
             await interaction.deleteReply().catch((deleteError) => {

@@ -28,10 +28,16 @@ const YOUTUBE_HOSTS_SET = new Set([
 function extractFeedItems(feed) {
     if (!feed) return [];
     if (Array.isArray(feed)) return feed;
-    if (feed.items && Array.isArray(feed.items)) return feed.items;
-    if (feed.contents && Array.isArray(feed.contents)) return feed.contents;
-    if (typeof feed[Symbol.iterator] === 'function') return Array.from(feed);
-    if (typeof feed.toArray === 'function') return feed.toArray();
+    // Try common array-like properties
+    for (const key of ['items', 'contents', 'videos', 'tracks', 'results']) {
+        if (feed[key] && Array.isArray(feed[key])) return feed[key];
+    }
+    if (typeof feed[Symbol.iterator] === 'function') {
+        try { return Array.from(feed); } catch { /* ignore */ }
+    }
+    if (typeof feed.toArray === 'function') {
+        try { return feed.toArray(); } catch { /* ignore */ }
+    }
     return [];
 }
 
@@ -39,9 +45,35 @@ function wrapPlaylist(playlist) {
     if (!playlist) return playlist;
 
     if (playlist.videos) {
-        const items = extractFeedItems(playlist.videos);
-        // Make .videos behave like an Array so the extractor's
-        // length / filter / map / iterator checks all work.
+        let items;
+        // ContinuationItemView bug: Array.from or toArray may throw due to parser error
+        // Try multiple strategies in order of reliability
+        try {
+            if (Array.isArray(playlist.videos)) {
+                items = playlist.videos;
+            } else if (playlist.videos.items && Array.isArray(playlist.videos.items)) {
+                items = playlist.videos.items;
+            } else if (playlist.videos.contents && Array.isArray(playlist.videos.contents)) {
+                items = playlist.videos.contents;
+            } else if (typeof playlist.videos.toArray === 'function') {
+                items = playlist.videos.toArray();
+            } else if (typeof playlist.videos[Symbol.iterator] === 'function') {
+                items = Array.from(playlist.videos);
+            } else {
+                items = [];
+            }
+        } catch (err) {
+            console.warn('[YoutubeExtractor patch] Error extracting feed items (ContinuationItemView bug?):', err.message);
+            // Last resort: try to manually pick known array properties
+            items = [];
+            for (const key of Object.keys(playlist.videos)) {
+                if (Array.isArray(playlist.videos[key]) && playlist.videos[key].length > 0) {
+                    const candidate = playlist.videos[key].filter(v => v && (v.id || v.videoId));
+                    if (candidate.length > 0) { items = candidate; break; }
+                }
+            }
+        }
+        // Proxy the videos Feed object to look like an array
         playlist.videos.length = items.length;
         playlist.videos.filter = (...a) => items.filter(...a);
         playlist.videos.map    = (...a) => items.map(...a);
@@ -49,6 +81,8 @@ function wrapPlaylist(playlist) {
         playlist.videos.find   = (...a) => items.find(...a);
         playlist.videos.slice  = (...a) => items.slice(...a);
         playlist.videos[Symbol.iterator] = () => items[Symbol.iterator]();
+        // Store raw items for our manual extractor to use directly
+        playlist._extractedItems = items;
     }
 
     if (typeof playlist.getContinuation === 'function') {
@@ -139,20 +173,30 @@ YoutubeExtractor.prototype.handle = async function (query, context) {
         let playlist = await this.innertube.getPlaylist(playlistId);
         playlist = wrapPlaylist(playlist);
 
-        const videos = extractFeedItems(playlist?.videos);
+        // Use pre-extracted items if available (from wrapPlaylist), otherwise try extractFeedItems
+        let videos;
+        if (playlist._extractedItems && playlist._extractedItems.length > 0) {
+            videos = playlist._extractedItems;
+        } else {
+            videos = extractFeedItems(playlist?.videos);
+        }
+
         const tracks = videos
             .filter(v => v && (v.id || v.videoId))
             .map(videoToTrackData);
 
-        // Attempt one page of continuation
-        if (typeof playlist?.getContinuation === 'function') {
+        // Attempt one page of continuation — but suppress ContinuationItemView errors
+        if (tracks.length > 0 && typeof playlist?.getContinuation === 'function') {
             try {
                 let cont = await playlist.getContinuation();
                 cont = wrapPlaylist(cont);
-                const more = extractFeedItems(cont?.videos);
-                tracks.push(...more.filter(v => v && (v.id || v.videoId)).map(videoToTrackData));
+                const moreItems = cont?._extractedItems || extractFeedItems(cont?.videos);
+                tracks.push(...moreItems.filter(v => v && (v.id || v.videoId)).map(videoToTrackData));
             } catch (contErr) {
-                console.warn('[YoutubeExtractor patch] Continuation failed:', contErr.message);
+                // ContinuationItemView not found is a known youtubei.js parser bug — not fatal
+                if (!contErr?.message?.includes('ContinuationItemView')) {
+                    console.warn('[YoutubeExtractor patch] Continuation failed:', contErr.message);
+                }
             }
         }
 

@@ -13,7 +13,7 @@
     "@google/generative-ai": "^0.24.1",
     "@snazzah/davey": "^0.1.11",
     "discord-player": "^7.2.0",
-    "discord-player-youtube": "^0.8.4",
+    "discord-player-youtube": "0.8.4",
     "discord.js": "^14.11.0",
     "dotenv": "^16.0.3",
     "express": "^4.21.2",
