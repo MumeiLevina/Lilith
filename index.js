@@ -324,23 +324,34 @@ client.player = new Player(client, {
 });
 client.musicReady = false;
 
-// ── Spotify Bridge: build fallback YouTube search queries from track metadata ──
+// ── Spotify Bridge: build fallback YouTube/SoundCloud search queries from track metadata ──
 // discord-player's SpotifyExtractor only gets Spotify metadata, then searches
-// YouTube to actually stream. If the default query fails we try simpler ones.
+// to actually stream. If the default query fails we try simpler ones on YouTube, then SoundCloud.
 function buildSpotifyFallbackQueries(track) {
     const title = (track.cleanTitle || track.title || '').trim();
     // Extract artists: track.author may be "Artist1, Artist2" or just one name
     const rawAuthor = (track.author || track.metadata?.artist || '').trim();
     const firstArtist = rawAuthor.split(/,|feat\.?|ft\.?|&/i)[0].trim();
 
-    const queries = [];
-    // Strategy 1: clean title + first artist (shorter = better YouTube match)
-    if (title && firstArtist) queries.push(`${title} ${firstArtist}`);
+    const textQueries = [];
+    // Strategy 1: clean title + first artist (shorter = better match)
+    if (title && firstArtist) textQueries.push(`${title} ${firstArtist}`);
     // Strategy 2: full author + title (standard format)
-    if (title && rawAuthor && rawAuthor !== firstArtist) queries.push(`${rawAuthor} ${title}`);
+    if (title && rawAuthor && rawAuthor !== firstArtist) textQueries.push(`${rawAuthor} ${title}`);
     // Strategy 3: title only (last resort)
-    if (title) queries.push(title);
-    return queries;
+    if (title) textQueries.push(title);
+    
+    const fallbacks = [];
+    // First try all queries on YouTube
+    for (const q of textQueries) {
+        fallbacks.push({ query: q, searchEngine: 'youtubeSearch' });
+    }
+    // Then try all queries on SoundCloud as a fallback
+    for (const q of textQueries) {
+        fallbacks.push({ query: q, searchEngine: 'soundcloudSearch' });
+    }
+    
+    return fallbacks;
 }
 
 client.player.extractors.loadMulti(DefaultExtractors)
@@ -474,16 +485,17 @@ client.player.events.on('playerError', async (queue, error, track) => {
         error?.message?.includes('Could not extract stream');
 
     if (isSpotifyTrack && isBridgeError && track) {
-        const fallbackQueries = buildSpotifyFallbackQueries(track);
+        const fallbackOptions = buildSpotifyFallbackQueries(track);
 
-        for (const fallbackQuery of fallbackQueries) {
+        for (const fallback of fallbackOptions) {
             try {
-                console.log(`[Spotify bridge] Retrying "${track.cleanTitle || track.title}" with query: ${fallbackQuery}`);
+                console.log(`[Spotify bridge] Retrying "${track.cleanTitle || track.title}" with query: ${fallback.query} on ${fallback.searchEngine}`);
                 const voiceChannel = queue.channel;
                 if (!voiceChannel) break;
 
-                const retryResult = await client.player.play(voiceChannel, fallbackQuery, {
+                const retryResult = await client.player.play(voiceChannel, fallback.query, {
                     requestedBy: track.requestedBy,
+                    searchEngine: fallback.searchEngine,
                     nodeOptions: {
                         metadata: queue.metadata,
                         leaveOnEmpty: true,
@@ -509,11 +521,11 @@ client.player.events.on('playerError', async (queue, error, track) => {
                             }
                         } catch { /* ignore reorder errors */ }
                     }
-                    console.log(`[Spotify bridge] Retry succeeded for "${track.cleanTitle || track.title}" using: ${fallbackQuery}`);
+                    console.log(`[Spotify bridge] Retry succeeded for "${track.cleanTitle || track.title}" using: ${fallback.query} on ${fallback.searchEngine}`);
                     return; // Success — don't fall through to the skip message
                 }
             } catch (retryErr) {
-                console.warn(`[Spotify bridge] Retry query "${fallbackQuery}" failed:`, retryErr?.message);
+                console.warn(`[Spotify bridge] Retry query "${fallback.query}" on ${fallback.searchEngine} failed:`, retryErr?.message);
             }
         }
         // All fallbacks exhausted — notify and let discord-player skip naturally
