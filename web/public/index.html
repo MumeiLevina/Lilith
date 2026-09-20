@@ -1,87 +1,294 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="vintage">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lilith Music Dashboard</title>
+  <title>Lilith Vintage Hi-Fi Music Deck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Press+Start+2P&family=Share+Tech+Mono&family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/dashboard/styles.css" />
 </head>
 <body>
+  <!-- Ambient CRT Scanline Overlay -->
+  <div class="crt-overlay" aria-hidden="true"></div>
+  <div class="vintage-vignette" aria-hidden="true"></div>
+
   <div class="frame-wrap">
-    <div class="app-shell">
+    <div class="app-shell" id="appShell">
+      <!-- Vintage Left Rack Sidebar -->
       <aside class="sidebar">
-        <div class="logo">Listen With Lilith</div>
-        <nav class="side-nav">
-          <button id="homeNavBtn" class="icon-btn" type="button" aria-label="Home">⌂</button>
-          <button id="favoritesNavBtn" class="icon-btn" type="button" aria-label="Favorites">❤</button>
-          <button class="icon-btn" type="button" aria-label="Tuning">┼</button>
+        <div class="brand-badge">
+          <div class="logo-mark">⚡</div>
+          <div class="logo">LILITH</div>
+          <span class="model-code">DECK 88-X</span>
+        </div>
+
+        <nav class="side-nav" aria-label="Deck navigation">
+          <button id="homeNavBtn" class="icon-btn is-active" type="button" aria-label="Home Deck" title="Deck Home">
+            <span class="btn-icon">⌂</span>
+            <span class="btn-tooltip">DECK</span>
+          </button>
+          <button id="favoritesNavBtn" class="icon-btn" type="button" aria-label="Favorites" title="Saved Mixtape">
+            <span class="btn-icon">❤</span>
+            <span class="btn-tooltip">FAVS</span>
+          </button>
+          <button id="crtToggleBtn" class="icon-btn" type="button" aria-label="Toggle CRT Screen FX" title="Toggle CRT FX">
+            <span class="btn-icon">📺</span>
+            <span class="btn-tooltip">CRT</span>
+          </button>
         </nav>
-        <button class="icon-btn sidebar-foot" type="button" aria-label="Tag">◧</button>
+
+        <div class="sidebar-foot">
+          <div class="screw-head screw-tl"></div>
+          <div class="screw-head screw-tr"></div>
+          <button class="icon-btn" id="ejectVisualBtn" type="button" aria-label="Eject Deck" title="Eject Platter">⏏</button>
+          <div class="audio-standard">HI-FI STEREO</div>
+          <div class="screw-head screw-bl"></div>
+          <div class="screw-head screw-br"></div>
+        </div>
       </aside>
 
+      <!-- Main Deck Console -->
       <main class="content">
+        <!-- Top Console Header -->
         <header class="topbar">
+          <div class="deck-meta-badge">
+            <span class="deck-title-sub">STUDIO MASTERING CONSOLE</span>
+            <span class="deck-title-main">SOLID STATE AUDIO RECEPTOR</span>
+          </div>
+
+          <!-- Retro Terminal Search Pill -->
           <label class="search-pill" for="queryInput">
-            <span>⌕</span>
-            <input id="queryInput" type="text" placeholder="Search for songs, artists" />
+            <span class="search-icon">🔍</span>
+            <span class="prompt-prefix">&gt;</span>
+            <input id="queryInput" type="text" placeholder="Tuning query: song, artist or URL..." autocomplete="off" />
+            <span class="cursor-blink">_</span>
           </label>
+
+          <!-- Top Actions & Retro Theme Switcher -->
           <div class="top-actions">
-            <select id="guildSelect" aria-label="Discord server"></select>
-            <button id="loginBtn" class="action-btn" type="button">Login with Discord</button>
-            <button id="logoutBtn" class="action-btn hidden" type="button">Logout</button>
+            <!-- Retro Theme Selector -->
+            <div class="theme-switcher" role="radiogroup" aria-label="Color Themes">
+              <button class="theme-pill active" type="button" data-set-theme="vintage" title="Vintage 80s Hi-Fi (Amber)">📻 Hi-Fi</button>
+              <button class="theme-pill" type="button" data-set-theme="synthwave" title="Cyber Synthwave (Neon)">🌆 Synth</button>
+              <button class="theme-pill" type="button" data-set-theme="terminal" title="Monochrome Phosphor (CRT)">📟 CRT</button>
+            </div>
+
+            <!-- Discord Server Selector with retro styling -->
+            <div class="select-container">
+              <select id="guildSelect" aria-label="Discord server"></select>
+            </div>
+
+            <button id="loginBtn" class="action-btn retro-mech-btn" type="button">
+              <span class="led-indicator led-off"></span>
+              <span>Discord Login</span>
+            </button>
+            <button id="logoutBtn" class="action-btn retro-mech-btn hidden" type="button">
+              <span class="led-indicator led-green"></span>
+              <span>Logout</span>
+            </button>
           </div>
         </header>
 
+        <!-- Hardware Status LED Indicator Strip -->
+        <div class="indicator-strip" aria-label="Hardware Status Indicators">
+          <div class="indicator-item">
+            <span class="indicator-led led-power" id="ledPower"></span>
+            <span class="indicator-label">POWER</span>
+          </div>
+          <div class="indicator-item">
+            <span class="indicator-led led-stereo" id="ledStereo"></span>
+            <span class="indicator-label">STEREO</span>
+          </div>
+          <div class="indicator-item">
+            <span class="indicator-led" id="ledPlaying"></span>
+            <span class="indicator-label">PLAYING</span>
+          </div>
+          <div class="indicator-item">
+            <span class="indicator-led" id="ledRepeat"></span>
+            <span class="indicator-label">REPEAT</span>
+          </div>
+          <div class="indicator-item">
+            <span class="indicator-led led-aux" id="ledAux"></span>
+            <span class="indicator-label">DISCORD AUX</span>
+          </div>
+          <div class="strip-engraving">PRECISION QUARTZ SYNTHESIZED SYSTEM // 33⅓ RPM</div>
+        </div>
+
+        <!-- Master Two-Column Hi-Fi Deck Layout -->
         <section class="dashboard-grid">
-          <section class="player-panel">
-            <div class="turntable">
-              <div class="record">
-                <div class="record-ring"></div>
-                <div class="record-center"></div>
+          <!-- LEFT: Hi-Fi Turntable & Audio Player Deck -->
+          <section class="player-panel" id="playerPanel">
+            <div class="panel-header-badge">
+              <span class="header-led"></span>
+              <span>ANALOG PLATTER & AMPLIFIER UNIT</span>
+            </div>
+
+            <!-- Vinyl Turntable Platter Enclosure -->
+            <div class="turntable-deck-housing">
+              <div class="turntable" id="turntable">
+                <!-- Stroboscopic Edge Rings -->
+                <div class="strobe-rim"></div>
+                <!-- Vinyl Record -->
+                <div class="record" id="recordDisk">
+                  <div class="record-grooves"></div>
+                  <div class="record-ring"></div>
+                  <div class="record-center">
+                    <div class="record-label-text">
+                      <span class="label-brand">LILITH</span>
+                      <span class="label-tech">STEREO 33⅓</span>
+                      <span class="label-micro">HI-FIDELITY</span>
+                    </div>
+                  </div>
+                  <div class="spindle-hole"></div>
+                </div>
+
+                <!-- Realistic Mechanical Tonearm Assembly -->
+                <div class="tonearm" id="tonearmAssembly">
+                  <div class="arm-gimbal">
+                    <div class="arm-weight"></div>
+                  </div>
+                  <span class="arm-joint"></span>
+                  <span class="arm-stem"></span>
+                  <span class="arm-head">
+                    <span class="cartridge-light"></span>
+                    <span class="stylus-needle"></span>
+                  </span>
+                </div>
+
+                <!-- Turntable Speed Controls & Pitch Trim (Aesthetic Details) -->
+                <div class="turntable-controls-overlay">
+                  <span class="speed-pill">33 RPM</span>
+                  <div class="power-toggle-switch" title="Turntable Motor Switch"></div>
+                </div>
               </div>
-              <div class="tonearm">
-                <span class="arm-joint"></span>
-                <span class="arm-stem"></span>
-                <span class="arm-head"></span>
+
+              <!-- Dual Analog Backlit VU Meters (Left & Right Channels) -->
+              <div class="vu-cluster" aria-label="Audio VU Meters">
+                <div class="vu-meter" id="vuMeterLeft">
+                  <div class="vu-glass">
+                    <div class="vu-scale">
+                      <span>-20</span>
+                      <span>-10</span>
+                      <span>-5</span>
+                      <span>0</span>
+                      <span class="vu-red">+3</span>
+                    </div>
+                    <div class="vu-needle" id="needleLeft"></div>
+                    <div class="vu-pivot"></div>
+                    <span class="vu-channel">CH-L (dB)</span>
+                  </div>
+                </div>
+                <div class="vu-meter" id="vuMeterRight">
+                  <div class="vu-glass">
+                    <div class="vu-scale">
+                      <span>-20</span>
+                      <span>-10</span>
+                      <span>-5</span>
+                      <span>0</span>
+                      <span class="vu-red">+3</span>
+                    </div>
+                    <div class="vu-needle" id="needleRight"></div>
+                    <div class="vu-pivot"></div>
+                    <span class="vu-channel">CH-R (dB)</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="track-row">
-              <h1 id="trackTitle">No track</h1>
-              <p class="likes">+392</p>
-            </div>
-            <div class="meta-row">
-              <span class="tag">Classic</span>
-              <button id="saveCurrentBtn" class="save-current-btn" type="button" aria-label="Save current track">♡ Save</button>
-              <p id="statusText">Please login to continue.</p>
+            <!-- VFD / Fluorescent Digital Readout Screen -->
+            <div class="vfd-screen">
+              <div class="vfd-glow"></div>
+              <div class="track-row">
+                <div class="vfd-title-box">
+                  <span class="vfd-sublabel">NOW AUDIBLE &gt;</span>
+                  <h1 id="trackTitle">No track</h1>
+                </div>
+                <p class="likes">+392</p>
+              </div>
+
+              <div class="meta-row">
+                <span class="tag">Classic</span>
+                <button id="saveCurrentBtn" class="save-current-btn retro-chip" type="button" aria-label="Save current track">
+                  <span class="rec-dot"></span>
+                  <span>♡ Save Tape</span>
+                </button>
+                <div class="vfd-status-wrapper">
+                  <span class="status-icon">●</span>
+                  <p id="statusText">Please login to continue.</p>
+                </div>
+              </div>
+
+              <!-- Digital Phosphor Timeline Counter -->
+              <div class="timeline">
+                <span id="currentTime" class="time-digit">0:00</span>
+                <div class="slider-track-wrap">
+                  <input id="seekBar" type="range" min="0" max="100" value="0" aria-label="Seek position" />
+                </div>
+                <span id="totalTime" class="time-digit">0:00</span>
+              </div>
             </div>
 
-            <div class="timeline">
-              <span id="currentTime">0:00</span>
-              <input id="seekBar" type="range" min="0" max="100" value="0" />
-              <span id="totalTime">0:00</span>
-            </div>
+            <!-- Heavy Mechanical Tactile Audio Controls -->
+            <div class="controls-deck-housing">
+              <div class="controls">
+                <button id="stopBtn" class="control-btn retro-mech-press" type="button" aria-label="Stop" title="Stop">
+                  <span class="btn-label">STOP</span>
+                  <span class="btn-symbol">⏹</span>
+                </button>
+                <button id="skipBtn" class="control-btn retro-mech-press" type="button" aria-label="Skip" title="Skip Track">
+                  <span class="btn-label">NEXT</span>
+                  <span class="btn-symbol">⏭</span>
+                </button>
+                <button id="pauseBtn" class="control-btn control-main retro-mech-press" type="button" aria-label="Pause" title="Play / Pause">
+                  <span class="btn-label">PLAY / PAUSE</span>
+                  <span class="btn-symbol">❚❚</span>
+                </button>
+                <button id="seekForwardBtn" class="control-btn retro-mech-press" type="button" aria-label="Seek forward 10 seconds" title="Fast Forward 10s">
+                  <span class="btn-label">FF +10S</span>
+                  <span class="btn-symbol">▷</span>
+                </button>
+                <button id="loopBtn" class="control-btn retro-mech-press" type="button" aria-label="Repeat current track" title="Auto Repeat">
+                  <span class="btn-label">REPEAT</span>
+                  <span class="btn-symbol">↻</span>
+                </button>
+              </div>
 
-            <div class="controls">
-              <button id="stopBtn" class="control-btn" type="button" aria-label="Stop">⏹</button>
-              <button id="skipBtn" class="control-btn" type="button" aria-label="Skip">⏭</button>
-              <button id="pauseBtn" class="control-btn control-main" type="button" aria-label="Pause">❚❚</button>
-              <button id="seekForwardBtn" class="control-btn" type="button" aria-label="Seek forward 10 seconds">▷</button>
-              <button id="loopBtn" class="control-btn" type="button" aria-label="Repeat current track">↻</button>
-            </div>
-
-            <div class="volume-row">
-              <label for="volumeInput">Volume</label>
-              <input id="volumeInput" type="range" min="0" max="200" value="100" />
+              <!-- Master Analog Volume Attenuator -->
+              <div class="volume-row">
+                <div class="volume-meta">
+                  <label for="volumeInput">MASTER ATTENUATION</label>
+                  <span id="volumeValueDisplay" class="volume-val">100%</span>
+                </div>
+                <div class="fader-track-wrap">
+                  <input id="volumeInput" type="range" min="0" max="200" value="100" aria-label="Volume level" />
+                  <div class="fader-scale">
+                    <span>-∞</span>
+                    <span>-12</span>
+                    <span>-6</span>
+                    <span>0dB</span>
+                    <span>+6dB</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
-          <aside class="playlist-panel">
-            <div class="panel-head">
-              <h2>Music Categories</h2>
+          <!-- RIGHT: Cassette Tape Rack, Categories & Queue Panel -->
+          <aside class="playlist-panel" id="playlistPanel">
+            <div class="panel-header-badge">
+              <span class="header-led"></span>
+              <span>MAG TAPE ARCHIVE & PRESETS</span>
             </div>
 
-            <div class="chips">
+            <div class="panel-head">
+              <h2>Music Categories</h2>
+              <span class="tape-counter">INDEX: #088</span>
+            </div>
+
+            <!-- Cassette Switchboard Genre Chips -->
+            <div class="chips" role="radiogroup" aria-label="Music Genres">
               <button class="chip-btn active" type="button" data-genre="classic">Classic</button>
               <button class="chip-btn" type="button" data-genre="90s">90s</button>
               <button class="chip-btn" type="button" data-genre="new">New</button>
@@ -89,9 +296,13 @@
               <button class="chip-btn" type="button" data-genre="modern">Modern</button>
             </div>
 
+            <!-- Tape Suggestions Panel -->
             <section class="suggestions-panel" aria-live="polite">
               <div class="suggestions-head">
-                <h4 id="suggestionTitle">Suggested for Classic</h4>
+                <div class="suggestions-title-group">
+                  <span class="tape-symbol">📼</span>
+                  <h4 id="suggestionTitle">Suggested for Classic</h4>
+                </div>
                 <p id="suggestionHint">Tap a category to get music ideas.</p>
               </div>
               <ul id="genreSuggestions" class="suggestion-list">
@@ -99,14 +310,21 @@
               </ul>
             </section>
 
-            <h3 id="queueHeading">Favorite Playlists</h3>
+            <!-- Tape Queue / Favorites Rack -->
+            <div class="queue-section-head">
+              <h3 id="queueHeading">Favorite Playlists</h3>
+              <div class="queue-badge-chip">ARCHIVE CASSETTES</div>
+            </div>
+
             <ul id="queueList" class="queue-list">
               <li class="queue-empty">No tracks in queue</li>
             </ul>
+
+            <!-- Retro Pagination Controls -->
             <div id="queuePagination" class="queue-pagination hidden" aria-label="Playlist pagination">
-              <button id="queuePrevBtn" class="page-btn" type="button">Previous</button>
-              <span id="queuePageInfo">Page 1 / 1</span>
-              <button id="queueNextBtn" class="page-btn" type="button">Next</button>
+              <button id="queuePrevBtn" class="page-btn retro-mech-btn" type="button">◀ REWIND</button>
+              <span id="queuePageInfo" class="page-counter">Page 1 / 1</span>
+              <button id="queueNextBtn" class="page-btn retro-mech-btn" type="button">FORWARD ▶</button>
             </div>
           </aside>
         </section>

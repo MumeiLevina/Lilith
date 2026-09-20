@@ -27,6 +27,19 @@ const suggestionTitle = document.getElementById('suggestionTitle');
 const suggestionHint = document.getElementById('suggestionHint');
 const genreSuggestions = document.getElementById('genreSuggestions');
 
+// Retro Hi-Fi Deck Controls & Visualizer Elements
+const appShell = document.getElementById('appShell');
+const turntable = document.getElementById('turntable');
+const needleLeft = document.getElementById('needleLeft');
+const needleRight = document.getElementById('needleRight');
+const ledPlaying = document.getElementById('ledPlaying');
+const ledRepeat = document.getElementById('ledRepeat');
+const volumeValueDisplay = document.getElementById('volumeValueDisplay');
+const crtToggleBtn = document.getElementById('crtToggleBtn');
+const themePills = Array.from(document.querySelectorAll('[data-set-theme]'));
+const ejectVisualBtn = document.getElementById('ejectVisualBtn');
+let vuMeterInterval = null;
+
 const FAVORITES_STORAGE_KEY = 'lilith:favorites:v1';
 const initialGuildId = new URLSearchParams(window.location.search).get('guildId');
 
@@ -534,6 +547,39 @@ function updatePauseButtonState(state) {
   pauseBtn.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
 }
 
+function updateRetroHardware(state) {
+  const isPlaying = !!(state?.active && !state?.paused && state?.nowPlaying);
+
+  turntable?.classList.toggle('is-playing', isPlaying);
+  appShell?.classList.toggle('is-playing', isPlaying);
+  ledPlaying?.classList.toggle('is-active', isPlaying);
+  ledPlaying?.classList.toggle('led-pulse', isPlaying);
+  ledRepeat?.classList.toggle('is-active', state?.repeatMode === 'track');
+
+  if (volumeValueDisplay && volumeInput) {
+    volumeValueDisplay.textContent = `${volumeInput.value}%`;
+  }
+
+  if (isPlaying) {
+    if (!vuMeterInterval) {
+      vuMeterInterval = setInterval(() => {
+        if (!needleLeft || !needleRight) return;
+        const leftDeg = -16 + Math.random() * 26;
+        const rightDeg = -14 + Math.random() * 28;
+        needleLeft.style.transform = `rotate(${leftDeg.toFixed(1)}deg)`;
+        needleRight.style.transform = `rotate(${rightDeg.toFixed(1)}deg)`;
+      }, 120);
+    }
+  } else {
+    if (vuMeterInterval) {
+      clearInterval(vuMeterInterval);
+      vuMeterInterval = null;
+    }
+    if (needleLeft) needleLeft.style.transform = 'rotate(-38deg)';
+    if (needleRight) needleRight.style.transform = 'rotate(-38deg)';
+  }
+}
+
 function renderState(state) {
   latestState = state || null;
 
@@ -545,6 +591,7 @@ function renderState(state) {
     updateSaveCurrentButton(null);
     updatePauseButtonState({ paused: false });
     updateLoopButtonState({ repeatMode: 'off' });
+    updateRetroHardware(null);
 
     if (!favoritesViewActive) {
       renderQueueList(state);
@@ -562,6 +609,7 @@ function renderState(state) {
   updateSaveCurrentButton(state.nowPlaying);
   updatePauseButtonState(state);
   updateLoopButtonState(state);
+  updateRetroHardware(state);
 
   if (!favoritesViewActive) {
     renderQueueList(state);
@@ -980,8 +1028,53 @@ if (genreSuggestions) {
   });
 }
 
+function initRetroControls() {
+  const THEME_KEY = 'lilith:retro:theme';
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'vintage';
+  applyTheme(savedTheme);
+
+  themePills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const theme = pill.dataset.setTheme;
+      if (theme) {
+        applyTheme(theme);
+        localStorage.setItem(THEME_KEY, theme);
+      }
+    });
+  });
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    themePills.forEach(p => p.classList.toggle('active', p.dataset.setTheme === theme));
+  }
+
+  const CRT_KEY = 'lilith:retro:no_crt';
+  const isNoCrt = localStorage.getItem(CRT_KEY) === 'true';
+  document.body.classList.toggle('no-crt', isNoCrt);
+  crtToggleBtn?.classList.toggle('is-active', !isNoCrt);
+
+  crtToggleBtn?.addEventListener('click', () => {
+    const disabled = document.body.classList.toggle('no-crt');
+    crtToggleBtn.classList.toggle('is-active', !disabled);
+    localStorage.setItem(CRT_KEY, String(disabled));
+    setStatus(disabled ? 'CRT scanlines disabled.' : 'CRT scanlines active.');
+  });
+
+  ejectVisualBtn?.addEventListener('click', () => {
+    turntable?.classList.toggle('is-playing');
+    setStatus('Platter tray toggled.');
+  });
+
+  volumeInput?.addEventListener('input', () => {
+    if (volumeValueDisplay) {
+      volumeValueDisplay.textContent = `${volumeInput.value}%`;
+    }
+  });
+}
+
 (async function boot() {
   try {
+    initRetroControls();
     renderGenreSuggestions(activeGenreKey);
     renderFavoritesList();
     setFavoritesView(false);
