@@ -1,6 +1,6 @@
 const User = require('../models/user');
 const Conversation = require('../models/conversation');
-const { handleGeminiRequest } = require('../utils/geminihandler');
+const { handleOpenAIRequest } = require('../utils/openaihandler');
 const { createRoleplayEmbed } = require('../utils/embeds');
 const {
     ActionRowBuilder,
@@ -526,7 +526,7 @@ module.exports = {
                     });
                     
                     // Get AI response
-                    const aiResponse = await handleGeminiRequest(conversation.messages, characterProfile);
+                    const aiResponse = await handleOpenAIRequest(conversation.messages, characterProfile);
                     
                     // Add AI response to conversation
                     conversation.messages.push({

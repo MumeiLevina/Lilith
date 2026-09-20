@@ -1,4 +1,13 @@
 require('dotenv').config();
+const dns = require('dns');
+
+// Configure public DNS servers to resolve MongoDB Atlas SRV records reliably
+try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch {
+    // Ignore if not supported
+}
+
 const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
